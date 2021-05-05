@@ -37,7 +37,7 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
     implementation 'io.github.controlwear:virtualjoystick:1.10.1'
-    implementation 'nl.bravobit:android-ffmpeg:1.1.7'
+  //  implementation 'nl.bravobit:android-ffmpeg:1.1.7'
     //implementation group: 'org.bytedeco', name: 'javacv-platform', version: '1.5.5'
     implementation 'org.jcodec:jcodec:0.2.5'
     implementation 'org.jcodec:jcodec:0.2.5'
