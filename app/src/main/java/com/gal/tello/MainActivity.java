@@ -335,9 +335,10 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
             }else{
 
             ByteBuffer bb = message; // Your frame data is stored in this buffer
-            Picture out = Picture.create(920, 720, ColorSpace.YUV420); // Allocate output frame of max size
-            Picture real = decoder.decodeFrame(bb, out.getData());
-            Bitmap bi = AndroidUtil.toBitmap(real); // If you prefere AWT image
+            Picture out = Picture.create(1920, 1088, ColorSpace.YUV420);  // Allocate output frame of max size
+            Picture real = decoder.decodeFrame(bb, Picture.create(1920, 1088, ColorSpace.YUV420).getData());
+            Bitmap bi = AndroidUtil.toBitmap(real);
+            imageView.setImageBitmap(bi);// If you prefere AWT image
                 }
             //imageView.setImageBitmap(bi);
         } catch (Exception e) {
@@ -393,13 +394,15 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
     private class VideoDatagramReceiver extends Thread {
         private boolean bKeepRunning = true;
         private String lastMessage = "";
+        private H264Decoder decoder;
 
         @Override
         public void run() {
+            this.decoder=new H264Decoder();
             Log.d("video start", "start");
             byte[] lmessage = new byte[2048];
             DatagramPacket packet = new DatagramPacket(lmessage, lmessage.length);
-            H264Decoder h264Decoder =new H264Decoder();
+
 
             try {
 
@@ -411,7 +414,7 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
                     try{
                         SendOneCommandwithoutreplay sendOneCommand = new SendOneCommandwithoutreplay();
                         sendOneCommand.doInBackground("streamon");
-                        handle(ByteBuffer.wrap(packet.getData()),h264Decoder);
+                        handle(ByteBuffer.wrap(packet.getData()),this.decoder);
 
                     }catch (RuntimeException e){Log.e("error",e.toString());}
 

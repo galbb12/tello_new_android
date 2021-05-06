@@ -3,13 +3,13 @@ plugins {
 }
 
 android {
-    compileSdkVersion 28
+    compileSdkVersion 30
     buildToolsVersion "30.0.2"
 
     defaultConfig {
         applicationId "com.gal.tello"
         minSdkVersion 19
-        targetSdkVersion 28
+        targetSdkVersion 30
         versionCode 1
         versionName "1.0"
 
@@ -40,7 +40,7 @@ dependencies {
     //implementation 'nl.bravobit:android-ffmpeg:1.1.7'
     //implementation group: 'org.bytedeco', name: 'javacv-platform', version: '1.5.5'
     //implementation group: 'org.bytedeco', name: 'javacv-platform', version: '1.5.5'
-    //implementation 'org.jcodec:jcodec:0.2.5'
-    //implementation 'org.jcodec:jcodec:0.2.5'
-    //implementation 'org.jcodec:jcodec-android:0.2.5'
+    implementation 'org.jcodec:jcodec:0.2.5'
+    implementation 'org.jcodec:jcodec:0.2.5'
+    implementation 'org.jcodec:jcodec-android:0.2.5'
 }
