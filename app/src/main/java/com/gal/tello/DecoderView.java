@@ -152,7 +152,7 @@ public class DecoderView extends SurfaceView  {
             }
             catch (Exception ex)
             {
-               ex.printStackTrace();
+                ex.printStackTrace();
 
                 //attempt to recover.
                 //codec.Release();
@@ -162,7 +162,6 @@ public class DecoderView extends SurfaceView  {
                 stop();
             }
         }
-        return;// ret;
     }
 
 

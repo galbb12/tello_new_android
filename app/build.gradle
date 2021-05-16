@@ -26,9 +26,6 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-    configurations.all {
-        resolutionStrategy.force 'com.google.code.findbugs:jsr305:3.0.2'
-    }
 }
 
 dependencies {
@@ -42,6 +39,7 @@ dependencies {
     implementation 'io.github.controlwear:virtualjoystick:1.10.1'
     implementation 'nl.bravobit:android-ffmpeg:1.1.7'
     //implementation group: 'org.bytedeco', name: 'javacv-platform', version: '1.5.5'
-    implementation 'org.jcodec:jcodec:0.2.5'
-    implementation 'org.jcodec:jcodec-android:0.2.5'
+    //implementation 'org.jcodec:jcodec:0.2.5'
+    //implementation 'org.jcodec:jcodec:0.2.5'
+    //implementation 'org.jcodec:jcodec-android:0.2.5'
 }

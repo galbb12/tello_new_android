@@ -3,7 +3,6 @@ package com.gal.tello;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.content.res.Configuration;
 import android.graphics.BitmapFactory;
 import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
@@ -13,37 +12,19 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.StrictMode;
 import android.util.Log;
-import android.view.Gravity;
-import android.view.SurfaceHolder;
-import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
-import android.view.ViewGroup.LayoutParams;
-import android.widget.Toast;
 
-import org.jcodec.codecs.h264.H264Decoder;
-import org.jcodec.common.model.ColorSpace;
-import org.jcodec.common.model.Picture;
 
-import android.content.res.Configuration;
-import android.net.Uri;
-import android.os.Bundle;
-import android.view.Gravity;
-import android.view.SurfaceHolder;
-import android.view.SurfaceView;
-import android.view.ViewGroup.LayoutParams;
-import android.widget.Toast;
-import org.videolan.libvlc.IVLCVout;
-import org.videolan.libvlc.LibVLC;
-import org.videolan.libvlc.Media;
-import org.videolan.libvlc.MediaPlayer;
-import java.lang.ref.WeakReference;
-import java.util.ArrayList;
+
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -51,7 +32,6 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
 
 import io.github.controlwear.virtual.joystick.android.JoystickView;
@@ -61,31 +41,29 @@ import nl.bravobit.ffmpeg.FFtask;
 
 import static java.lang.Math.max;
 
+
 import java.lang.*;
 
 
-public class MainActivity extends AppCompatActivity implements IVLCVout.Callback{
-    private H264Decoder decoder;
+public class MainActivity extends AppCompatActivity implements TextureView.SurfaceTextureListener{
+
     public static final int TELLO_CAM_LISTEN_PORT = 11111;
-    String output;
+    String ffmpegoutput;
+    String copyoutput;
     Button streamon;
     Button takeoff;
     Button land;
     Button stopffmpegtask;
     TextureView textureView;
-    SurfaceView mSurface;
-    private SurfaceHolder holder;
-    private String mFilePath="udp://@:8555/tello";
+    ImageView imageView;
+
     FFtask fftask;
     private MediaCodec m_codec;// Media decoder
     private DatagramSocket socketMainSending;
     private InetAddress inetAddressMainSending;
     public static final int portMainSending = 8889;
     public static final String addressMainSending = "192.168.10.1";
-    private LibVLC libvlc;
-    private MediaPlayer mMediaPlayer = null;
-    private int mVideoWidth;
-    private int mVideoHeight;
+
     DatagramSocket socketStatusServer;
     DatagramSocket socketStreamOnServer;
     private static final String SAMPLE_URL = "udp://@0.0.0.0:11111";
@@ -104,8 +82,7 @@ public class MainActivity extends AppCompatActivity implements IVLCVout.Callback
         land=findViewById(R.id.Land);
         streamon=findViewById(R.id.StremOn);
         //textureView=findViewById(R.id.textureView);
-        mSurface=findViewById(R.id.player_view);
-        holder=mSurface.getHolder();
+        imageView=findViewById(R.id.player_view);
         stopffmpegtask=findViewById(R.id.stop_ffmpeg_task);
         joystick.setOnMoveListener(new JoystickView.OnMoveListener() {
             @Override
@@ -215,7 +192,25 @@ public class MainActivity extends AppCompatActivity implements IVLCVout.Callback
 
     }
 
+    @Override
+    public void onSurfaceTextureAvailable(@NonNull SurfaceTexture surface, int width, int height) {
 
+    }
+
+    @Override
+    public void onSurfaceTextureSizeChanged(@NonNull SurfaceTexture surface, int width, int height) {
+
+    }
+
+    @Override
+    public boolean onSurfaceTextureDestroyed(@NonNull SurfaceTexture surface) {
+        return false;
+    }
+
+    @Override
+    public void onSurfaceTextureUpdated(@NonNull SurfaceTexture surface) {
+
+    }
 
     public class SendOneCommand extends AsyncTask<String, String, String> {
 
@@ -305,11 +300,7 @@ public class MainActivity extends AppCompatActivity implements IVLCVout.Callback
         }
     }
 
-    void handle(byte[] message) {
-        Picture out = Picture.create(1920, 1088, ColorSpace.YUV420); // Allocate output frame of max size
-        Picture real = decoder.decodeFrame(ByteBuffer.wrap(message), out.getData());
-        System.out.println(real.getWidth() +  " : " + real.getHeight());
-    }
+
 
     public void streamon() {
 
@@ -330,7 +321,7 @@ public class MainActivity extends AppCompatActivity implements IVLCVout.Callback
             //    @Override
             //    protected void handle(byte[] message) {
             //        Log.d("decode","DECODE");
-            //        Picture out = Picture.create(1920, 1088, ColorSpace.YUV420); // Allocate output frame of max size
+            //        Picture out = Picture.create(1920, 1088, ColorSpace.YUV420); // Allocate ffmpegoutput frame of max size
             //        Picture real = decoder.decodeFrame(ByteBuffer.wrap(message), out.getData());
             //        Log.d("imagesize",real.getWidth() +  " : " + real.getHeight());
             //    }
@@ -342,48 +333,7 @@ public class MainActivity extends AppCompatActivity implements IVLCVout.Callback
         } catch (Exception e) {
         }
     }
-    private class VideoDatagramReceiver extends Thread {
-        private boolean bKeepRunning = true;
-        private String lastMessage = "";
 
-        @Override
-        public void run() {
-            Log.d("video start", "start");
-            byte[] lmessage = new byte[50000];
-            DatagramPacket packet = new DatagramPacket(lmessage, lmessage.length);
-
-            try {
-
-
-                while(bKeepRunning) {
-                    socketStreamOnServer.receive(packet);
-                    Log.d("video length", String.valueOf(new String(lmessage, 0, packet.getLength()).trim().length()));
-
-                    try{
-                        handle(lmessage);
-
-                    }catch (RuntimeException e){Log.e("error",e.toString());}
-
-
-
-
-
-                }
-
-                if (socketStatusServer == null) {
-                    socketStatusServer.close();
-                }
-
-            } catch (IOException ioe){
-
-            }
-
-        }
-
-        public void kill() {
-            bKeepRunning = false;
-        }
-    }
 
     public void rc() {
 
@@ -428,78 +378,89 @@ public class MainActivity extends AppCompatActivity implements IVLCVout.Callback
             bKeepRunning = false;
         }
     }
+    public static void copy(File src, File dst) throws IOException {
+        try (InputStream in = new FileInputStream(src)) {
+            try (FileOutputStream out = new FileOutputStream(dst)) {
+                // Transfer bytes from in to out
+                byte[] buf = new byte[1024];
+                int len;
+                while ((len = in.read(buf)) > 0) {
+                    out.write(buf, 0, len);
+                }
+            }
+        }
+    }
+    private class displayimage extends Thread {
+        private boolean bKeepRunning = true;
 
-  //  private class displayimage extends Thread {
-  //      private boolean bKeepRunning = true;
-//
-//
-  //      @Override
-  //      public void run() {
-//
-//
-//
-//
-//
-  //          final Handler handler = new Handler();
-  //          Runnable runnable =  new Runnable() {
-  //              @Override
-  //              public void run() {
-//
-  //                  File f = new File(output);
-  //                  if(f.isFile())
-//
-  //                  {
-  //                      imageView.setImageBitmap(BitmapFactory.decodeFile(output));
-  //                  }
-  //                  if(bKeepRunning==true){
-  //                      handler.postDelayed(this, 33);
-  //                  }
-  //              }
-//
-//
-//
-  //          };
-  //          handler.postDelayed(runnable, 1);
-//
-  //      }
-//
-  //      public void kill() {
-  //          bKeepRunning = false;
-  //      }
-  //  }
+
+        @Override
+        public void run() {
+
+            File s = new File(ffmpegoutput);
+            File d = new File(copyoutput);
+
+
+
+            final Handler handler = new Handler();
+            Runnable runnable =  new Runnable() {
+
+                @Override
+                public void run() {
+
+                    try {
+                        copy(s, d);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                   // Log.d("bitmap size", String.valueOf(Integer.parseInt(String.valueOf(d.length() / 1024))));
+                    if (Integer.parseInt(String.valueOf(d.length() / 1024)) == 2025) {
+                        imageView.setImageBitmap(BitmapFactory.decodeFile(copyoutput));
+                    }
+                    if (bKeepRunning == true) {
+                        handler.postDelayed(this, 10);
+                    }
+
+
+                }
+            };
+            handler.postDelayed(runnable, 0);
+
+        }
+
+        public void kill() {
+            bKeepRunning = false;
+        }
+    }
 
 
     void startffmpegstream(){
         if (FFmpeg.getInstance(this).isSupported()) {
-       //    File directory = getFilesDir();
-       //    output = directory + "/tello.bmp";
+            File directory = getFilesDir();
+            ffmpegoutput = directory + "/tellobuffer.bmp";
+            copyoutput = directory + "/tellobuffercopy.bmp";
 
 
-       //   // Log.v("MainActivity", "The storage path is: " + output);
-       //    String[] cmdold = {"-y","-i", "udp://0.0.0.0:11111","-r", "30/1","-update","1",output};
-            String[] cmd = {"-f", "mpegts", "-i", "udp://:11111", "-f", "mpegts","udp://127.0.0.1:8555/tello?pkt_size=64"};
+            Log.v("MainActivity", "The storage path is: " + ffmpegoutput);
+            String[] cmd = {"-y","-flags" ,"low_delay","-probesize","32","-i", "udp://127.0.0.1:11111","-tune" ,"zerolatency","-framerate", "10","-vf", "fps=10","-update","1",ffmpegoutput};
             FFmpeg ffmpeg = FFmpeg.getInstance(this);
 
 
             // to execute "ffmpeg -version" command you just need to pass "-version"
             fftask = ffmpeg.execute(cmd, new ExecuteBinaryResponseHandler() {
-
+                
                 @Override
                 public void onStart() {
-
-                 //   displayimage displayimage=new displayimage();
-                 //   displayimage.run();
-
+                   displayimage displayimage=new displayimage();
+                   displayimage.run();
                 }
 
                 @Override
                 public void onProgress(String message) {
-                    Log.d("p",message);
-
                     //while (true){
-                    //    File f = new File(output);
+                    //    File f = new File(ffmpegoutput);
                     //    if(f.isFile()){
-                    //  imageView.setImageBitmap(BitmapFactory.decodeFile(output));}
+                    //  imageView.setImageBitmap(BitmapFactory.decodeFile(ffmpegoutput));}
                     //}
                 }
 
@@ -515,138 +476,14 @@ public class MainActivity extends AppCompatActivity implements IVLCVout.Callback
                 }
 
                 @Override
-                public void onFinish() {}
+                public void onFinish() {
+
+                }
 
             });
-            setSize(920,720);
-            createPlayer(mFilePath);
 
         }
     }
-    private void setSize(int width, int height) {
-        mVideoWidth = width;
-        mVideoHeight = height;
-        if (mVideoWidth * mVideoHeight <= 1)
-            return;
-        if (holder == null || mSurface == null)
-            return;
-        int w = getWindow().getDecorView().getWidth();
-        int h = getWindow().getDecorView().getHeight();
-        boolean isPortrait = getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT;
-        if (w > h && isPortrait || w < h && !isPortrait) {
-            int i = w;
-            w = h;
-            h = i;
-        }
-        float videoAR = (float) mVideoWidth / (float) mVideoHeight;
-        float screenAR = (float) w / (float) h;
-        if (screenAR < videoAR)
-            h = (int) (w / videoAR);
-        else
-            w = (int) (h * videoAR);
-        holder.setFixedSize(mVideoWidth, mVideoHeight);
-        LayoutParams lp = mSurface.getLayoutParams();
-        lp.width = w;
-        lp.height = h;
-        mSurface.setLayoutParams(lp);
-        mSurface.invalidate();
-    }
-
-
-    private void createPlayer(String media) {
-        releasePlayer();
-        try {
-            if (media.length() > 0) {
-                Toast toast = Toast.makeText(this, media, Toast.LENGTH_LONG);
-                toast.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, 0,
-                        0);
-                toast.show();
-            }
-            // Create LibVLC
-            // TODO: make this more robust, and sync with audio demo
-            ArrayList<String> options = new ArrayList<String>();
-            //options.add("--subsdec-encoding <encoding>");
-            options.add("--aout=opensles");
-            options.add("--audio-time-stretch"); // time stretching
-            options.add("-vvv"); // verbosity
-            libvlc = new LibVLC(this, options);
-            holder.setKeepScreenOn(true);
-            // Creating media player
-            mMediaPlayer = new MediaPlayer(libvlc);
-            mMediaPlayer.setEventListener(mPlayerListener);
-            // Seting up video output
-            final IVLCVout vout = mMediaPlayer.getVLCVout();
-            vout.setVideoView(mSurface);
-            //vout.setSubtitlesView(mSurfaceSubtitles);
-            vout.addCallback(this);
-            vout.attachViews();
-            Media m = new Media(libvlc, Uri.parse(media));
-            mMediaPlayer.setMedia(m);
-            mMediaPlayer.play();
-        } catch (Exception e) {
-            Toast.makeText(this, "Error in creating player!", Toast
-                    .LENGTH_LONG).show();
-        }
-    }
-    private void releasePlayer() {
-        if (libvlc == null)
-            return;
-        mMediaPlayer.stop();
-        final IVLCVout vout = mMediaPlayer.getVLCVout();
-        vout.removeCallback(this);
-        vout.detachViews();
-        holder = null;
-        libvlc.release();
-        libvlc = null;
-        mVideoWidth = 0;
-        mVideoHeight = 0;
-    }
-    private MediaPlayer.EventListener mPlayerListener = new MyPlayerListener(this);
-    @Override
-    public void onNewLayout(IVLCVout vout, int width, int height, int visibleWidth, int visibleHeight, int sarNum, int sarDen) {
-        if (width * height == 0)
-            return;
-        // store video size
-        mVideoWidth = width;
-        mVideoHeight = height;
-        setSize(mVideoWidth, mVideoHeight);
-    }
-    @Override
-    public void onSurfacesCreated(IVLCVout vout) {
-    }
-    @Override
-    public void onSurfacesDestroyed(IVLCVout vout) {
-    }
-    @Override
-    public void onHardwareAccelerationError(IVLCVout vlcVout) {
-        Log.e("TAG", "Error with hardware acceleration");
-        this.releasePlayer();
-        Toast.makeText(this, "Error with hardware acceleration", Toast.LENGTH_LONG).show();
-    }
-    private static class MyPlayerListener implements MediaPlayer.EventListener {
-        private WeakReference<MainActivity> mOwner;
-        public MyPlayerListener(MainActivity owner) {
-            mOwner = new WeakReference<MainActivity>(owner);
-        }
-        @Override
-        public void onEvent(MediaPlayer.Event event) {
-            MainActivity player = mOwner.get();
-            switch (event.type) {
-                case MediaPlayer.Event.EndReached:
-                    Log.d("TAG", "MediaPlayerEndReached");
-                    player.releasePlayer();
-                    break;
-                case MediaPlayer.Event.Playing:
-                case MediaPlayer.Event.Paused:
-                case MediaPlayer.Event.Stopped:
-                default:
-                    break;
-            }
-        }
-    }
-
-
-
 
 
 
