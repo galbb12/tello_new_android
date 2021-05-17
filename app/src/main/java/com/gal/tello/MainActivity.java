@@ -3,14 +3,16 @@ package com.gal.tello;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.StrictMode;
+import android.util.AttributeSet;
 import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
@@ -21,10 +23,7 @@ import android.widget.ImageView;
 
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -32,12 +31,13 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import io.github.controlwear.virtual.joystick.android.JoystickView;
-import nl.bravobit.ffmpeg.ExecuteBinaryResponseHandler;
-import nl.bravobit.ffmpeg.FFmpeg;
-import nl.bravobit.ffmpeg.FFtask;
+//import nl.bravobit.ffmpeg.ExecuteBinaryResponseHandler;
+//import nl.bravobit.ffmpeg.FFmpeg;
+//import nl.bravobit.ffmpeg.FFtask;
 
 import static java.lang.Math.max;
 
@@ -46,18 +46,24 @@ import java.lang.*;
 
 
 public class MainActivity extends AppCompatActivity implements TextureView.SurfaceTextureListener{
-
+    public static byte[] lmessage = new byte[2048];
     public static final int TELLO_CAM_LISTEN_PORT = 11111;
-    String ffmpegoutput;
-    String copyoutput;
+    String output;
     Button streamon;
     Button takeoff;
     Button land;
     Button stopffmpegtask;
     TextureView textureView;
-    ImageView imageView;
 
-    FFtask fftask;
+   // DecoderView decoderView = new DecoderView();
+    private byte[] sps = new byte[] {(byte) 0, (byte)0,(byte) 0,(byte) 1,(byte) 103,(byte) 77, (byte)64,(byte) 40,(byte) 149, (byte)160, (byte)60,(byte) 5,(byte) 185 };
+    private boolean bWaitForKeyframe = true;
+
+    //vid mode sps
+    private byte[] vidSps = new byte[] { (byte)0,(byte) 0, (byte)0, (byte)1, (byte)103, (byte)77,(byte) 64,(byte) 40,(byte) 149, (byte)160,(byte) 20,(byte) 1, (byte)110, (byte)64 };
+
+    private byte[] pps = { (byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
+    //FFtask fftask;
     private MediaCodec m_codec;// Media decoder
     private DatagramSocket socketMainSending;
     private InetAddress inetAddressMainSending;
@@ -69,6 +75,8 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
     private static final String SAMPLE_URL = "udp://@0.0.0.0:11111";
     public static final int portMainVideo = 11111;
     double a=0, b=0, c=0, d=0;
+    DecoderView decoderView;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -82,7 +90,6 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         land=findViewById(R.id.Land);
         streamon=findViewById(R.id.StremOn);
         //textureView=findViewById(R.id.textureView);
-        imageView=findViewById(R.id.player_view);
         stopffmpegtask=findViewById(R.id.stop_ffmpeg_task);
         joystick.setOnMoveListener(new JoystickView.OnMoveListener() {
             @Override
@@ -142,8 +149,8 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         stopffmpegtask.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if(fftask!=null){
-                    fftask.sendQuitSignal();}
+                //    if(fftask!=null){
+                //    fftask.sendQuitSignal();}
             }
         });
         Initialize();
@@ -268,6 +275,33 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         }
     }
 
+    public class SendBytesWithoutReplay extends AsyncTask<byte[], Byte[], String> {
+
+        @Override
+        protected String doInBackground(byte[]... bytes) {
+
+            byte[] buf = bytes[0];
+            DatagramPacket packet = new DatagramPacket(buf, buf.length, inetAddressMainSending, portMainSending);
+            try {
+                socketMainSending.send(packet);
+
+            } catch (IOException e) {
+                Log.e("IOException",e.getMessage());
+
+            } catch (Exception e) {
+                Log.e("Exception",e.getMessage());
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+        }
+
+
+    }
+
 
 
     public void connect() {
@@ -300,7 +334,16 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         }
     }
 
-
+    void handle(byte[] message) {
+        try {
+            //   ByteBuffer bb =message; // Your frame data is stored in this buffer
+            //   Picture real = decoder.decodeFrame(bb, out.getData());
+            //   Bitmap bi = AndroidUtil.toBitmap(real); // If you prefere AWT image
+            //   imageView.setImageBitmap(bi);
+            DecoderView imageView=findViewById(R.id.decoderView);
+            decoderView.decode();
+        }catch (Exception e){e.printStackTrace();}
+    }
 
     public void streamon() {
 
@@ -309,19 +352,20 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
 
 
 
+            //startffmpegstream();
             SendOneCommandwithoutreplay sendOneCommand = new SendOneCommandwithoutreplay();
             sendOneCommand.doInBackground("streamon");
-            startffmpegstream();
-            //  socketStreamOnServer = new DatagramSocket(null);
-            //  InetSocketAddress addressVideo = new InetSocketAddress("0.0.0.0", 11111);
-            //  socketStreamOnServer.bind(addressVideo);
-            // VideoDatagramReceiver videoDatagramReceiver = new VideoDatagramReceiver();
-            // videoDatagramReceiver.start();
+            socketStreamOnServer = new DatagramSocket(null);
+            InetSocketAddress addressVideo = new InetSocketAddress("0.0.0.0", 11111);
+            socketStreamOnServer.bind(addressVideo);
+            VideoDatagramReceiver videoDatagramReceiver = new VideoDatagramReceiver();
+            videoDatagramReceiver.start();
+
             //VideoServer videoServer= new VideoServer() {
             //    @Override
             //    protected void handle(byte[] message) {
             //        Log.d("decode","DECODE");
-            //        Picture out = Picture.create(1920, 1088, ColorSpace.YUV420); // Allocate ffmpegoutput frame of max size
+            //        Picture out = Picture.create(1920, 1088, ColorSpace.YUV420); // Allocate output frame of max size
             //        Picture real = decoder.decodeFrame(ByteBuffer.wrap(message), out.getData());
             //        Log.d("imagesize",real.getWidth() +  " : " + real.getHeight());
             //    }
@@ -333,7 +377,52 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         } catch (Exception e) {
         }
     }
+    private class VideoDatagramReceiver extends Thread {
+        private boolean bKeepRunning = true;
+        private String lastMessage = "";
 
+        @Override
+        public void run() {
+            Log.d("video start", "start");
+            DatagramPacket packet = new DatagramPacket(lmessage, lmessage.length);
+
+            try {
+
+
+                while(bKeepRunning) {
+                    socketStreamOnServer.receive(packet);
+                    Log.d("video length", String.valueOf(new String(lmessage, 0, packet.getLength()).trim().length()));
+
+                    try{
+                        if(packet.getData()!=null){
+                                    DecoderView imageView=findViewById(R.id.decoderView);
+                                    imageView.decode();
+                        }else{
+                            Log.d("video packet","video packet is null");
+                        }
+
+                    }catch (RuntimeException e){Log.e("error",e.toString());}
+
+
+
+
+
+                }
+
+                if (socketStatusServer == null) {
+                    socketStatusServer.close();
+                }
+
+            } catch (IOException ioe){
+
+            }
+
+        }
+
+        public void kill() {
+            bKeepRunning = false;
+        }
+    }
 
     public void rc() {
 
@@ -378,112 +467,96 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
             bKeepRunning = false;
         }
     }
-    public static void copy(File src, File dst) throws IOException {
-        try (InputStream in = new FileInputStream(src)) {
-            try (FileOutputStream out = new FileOutputStream(dst)) {
-                // Transfer bytes from in to out
-                byte[] buf = new byte[1024];
-                int len;
-                while ((len = in.read(buf)) > 0) {
-                    out.write(buf, 0, len);
-                }
-            }
-        }
-    }
-    private class displayimage extends Thread {
-        private boolean bKeepRunning = true;
+
+//   private class displayimage extends Thread {
+//       private boolean bKeepRunning = true;
 
 
-        @Override
-        public void run() {
-
-            File s = new File(ffmpegoutput);
-            File d = new File(copyoutput);
+//       @Override
+//       public void run() {
 
 
 
-            final Handler handler = new Handler();
-            Runnable runnable =  new Runnable() {
-
-                @Override
-                public void run() {
-
-                    try {
-                        copy(s, d);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                   // Log.d("bitmap size", String.valueOf(Integer.parseInt(String.valueOf(d.length() / 1024))));
-                    if (Integer.parseInt(String.valueOf(d.length() / 1024)) == 2025) {
-                        imageView.setImageBitmap(BitmapFactory.decodeFile(copyoutput));
-                    }
-                    if (bKeepRunning == true) {
-                        handler.postDelayed(this, 10);
-                    }
 
 
-                }
-            };
-            handler.postDelayed(runnable, 0);
+//           final Handler handler = new Handler();
+//           Runnable runnable =  new Runnable() {
+//               @Override
+//               public void run() {
 
-        }
+//                   File f = new File(output);
+//                   if(f.isFile())
 
-        public void kill() {
-            bKeepRunning = false;
-        }
-    }
-
-
-    void startffmpegstream(){
-        if (FFmpeg.getInstance(this).isSupported()) {
-            File directory = getFilesDir();
-            ffmpegoutput = directory + "/tellobuffer.bmp";
-            copyoutput = directory + "/tellobuffercopy.bmp";
+//                   {
+//                       imageView.setImageBitmap(BitmapFactory.decodeFile(output));
+//                   }
+//                   if(bKeepRunning==true){
+//                       handler.postDelayed(this, 5);
+//                   }
+//               }
 
 
-            Log.v("MainActivity", "The storage path is: " + ffmpegoutput);
-            String[] cmd = {"-y","-flags" ,"low_delay","-probesize","32","-i", "udp://127.0.0.1:11111","-tune" ,"zerolatency","-framerate", "10","-vf", "fps=10","-update","1",ffmpegoutput};
-            FFmpeg ffmpeg = FFmpeg.getInstance(this);
+
+//           };
+//           handler.postDelayed(runnable, 5);
+
+//       }
+
+//       public void kill() {
+//           bKeepRunning = false;
+//       }
+//   }
 
 
-            // to execute "ffmpeg -version" command you just need to pass "-version"
-            fftask = ffmpeg.execute(cmd, new ExecuteBinaryResponseHandler() {
-                
-                @Override
-                public void onStart() {
-                   displayimage displayimage=new displayimage();
-                   displayimage.run();
-                }
-
-                @Override
-                public void onProgress(String message) {
-                    //while (true){
-                    //    File f = new File(ffmpegoutput);
-                    //    if(f.isFile()){
-                    //  imageView.setImageBitmap(BitmapFactory.decodeFile(ffmpegoutput));}
-                    //}
-                }
-
-                @Override
-                public void onFailure(String message) {
-                    Log.v("TEST", "FFMPEG streaming command failure: " + message);
-
-                }
-
-                @Override
-                public void onSuccess(String message) {
-
-                }
-
-                @Override
-                public void onFinish() {
-
-                }
-
-            });
-
-        }
-    }
+//   //  void startffmpegstream(){
+//   //      if (FFmpeg.getInstance(this).isSupported()) {
+//   //          File directory = getFilesDir();
+//   //          output = directory + "/tello.bmp";
+///
+///
+//   //          Log.v("MainActivity", "The storage path is: " + output);
+//   //          String[] cmd = {"-y","-i", "udp://127.0.0.1:11111","-r", "5/1","-update","1",output};
+//   //          FFmpeg ffmpeg = FFmpeg.getInstance(this);
+///
+///
+//   //          // to execute "ffmpeg -version" command you just need to pass "-version"
+//   //          fftask = ffmpeg.execute(cmd, new ExecuteBinaryResponseHandler() {
+///
+//   //              @Override
+//   //              public void onStart() {
+///
+//   //                  displayimage displayimage=new displayimage();
+//   //                  displayimage.run();
+//   //              }
+///
+//   //              @Override
+//   //              public void onProgress(String message) {
+///
+//   //                 //while (true){
+//   //                 //    File f = new File(output);
+//   //                 //    if(f.isFile()){
+//   //                 //  imageView.setImageBitmap(BitmapFactory.decodeFile(output));}
+//   //                 //}
+//   //              }
+///
+//   //              @Override
+//   //              public void onFailure(String message) {
+//   //                  Log.v("TEST", "FFMPEG streaming command failure: " + message);
+///
+//   //              }
+///
+//   //              @Override
+//   //              public void onSuccess(String message) {
+///
+//   //              }
+///
+//   //              @Override
+//   //              public void onFinish() {}
+///
+//   //          });
+///
+//   //      }
+//   //  }
 
 
 
