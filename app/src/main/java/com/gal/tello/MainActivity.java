@@ -1,6 +1,7 @@
 package com.gal.tello;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Context;
@@ -9,11 +10,13 @@ import android.graphics.BitmapFactory;
 import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.StrictMode;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.Xml;
 import android.view.TextureView;
 import android.view.View;
 import android.widget.Button;
@@ -31,6 +34,9 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -54,6 +60,9 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
     Button land;
     Button stopffmpegtask;
     TextureView textureView;
+    static JoystickView joystick;
+    static JoystickView joystick1;
+    private static int sequence = 1;
 
    // DecoderView decoderView = new DecoderView();
     private byte[] sps = new byte[] {(byte) 0, (byte)0,(byte) 0,(byte) 1,(byte) 103,(byte) 77, (byte)64,(byte) 40,(byte) 149, (byte)160, (byte)60,(byte) 5,(byte) 185 };
@@ -84,46 +93,50 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         setContentView(R.layout.activity_main);
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
         StrictMode.setThreadPolicy(policy);
-        final JoystickView joystick = (JoystickView) findViewById(R.id.joystickView);
-        final JoystickView joystick1 = (JoystickView) findViewById(R.id.joystickView1);
+        joystick = (JoystickView) findViewById(R.id.joystickView);
+        joystick1 = (JoystickView) findViewById(R.id.joystickView1);
         takeoff=findViewById(R.id.TakeOff);
         land=findViewById(R.id.Land);
         streamon=findViewById(R.id.StremOn);
         //textureView=findViewById(R.id.textureView);
         stopffmpegtask=findViewById(R.id.stop_ffmpeg_task);
         joystick.setOnMoveListener(new JoystickView.OnMoveListener() {
+            @RequiresApi(api = Build.VERSION_CODES.O)
             @Override
             public void onMove(int angle, int strength) {
                 // double theta = angle * PI / 180;
                 // int dx = (int) (strength*cos(theta));
                 // int dy = (int) (strength * sin(theta));
-                a = (joystick.getNormalizedX() - 50) * 2;
-                b = -(joystick.getNormalizedY() - 50) * 2;
-                // a=dx;
-                // b=dy;
-                // Log.d("dx joystic1", String.valueOf(dx));
-                // Log.d("dy joystic1", String.valueOf(dx));
-                d = (joystick1.getNormalizedX() - 50) * 2;
-                c = -(joystick1.getNormalizedY() - 50) * 2;
-                rc();
+          //     a = (joystick.getNormalizedX() - 50) * 2;
+          //     b = -(joystick.getNormalizedY() - 50) * 2;
+          //     // a=dx;
+          //     // b=dy;
+          //     // Log.d("dx joystic1", String.valueOf(dx));
+          //     // Log.d("dy joystic1", String.valueOf(dx));
+          //     d = (joystick1.getNormalizedX() - 50) * 2;
+          //     c = -(joystick1.getNormalizedY() - 50) * 2;
+          //     rc();
+                sendControllerUpdate();
             }
         });
         joystick1.setOnMoveListener(new JoystickView.OnMoveListener() {
+            @RequiresApi(api = Build.VERSION_CODES.O)
             @Override
             public void onMove(int angle, int strength) {
-                a = (joystick.getNormalizedX() - 50) * 2;
-                b = -(joystick.getNormalizedY() - 50) * 2;
-                //double theta = angle * PI /180;
-                //int dx = (int) (100*cos(theta));
-                //int dy = (int) (100 * sin(theta));
-                d = (joystick1.getNormalizedX() - 50) * 2;
-                c = -(joystick1.getNormalizedY() - 50) * 2;
+             //   a = (joystick.getNormalizedX() - 50) * 2;
+             //   b = -(joystick.getNormalizedY() - 50) * 2;
+             //   //double theta = angle * PI /180;
+             //   //int dx = (int) (100*cos(theta));
+             //   //int dy = (int) (100 * sin(theta));
+             //   d = (joystick1.getNormalizedX() - 50) * 2;
+             //   c = -(joystick1.getNormalizedY() - 50) * 2;
+                sendControllerUpdate();
                 //d=dx;
                 //c=dy;
                 //Log.d("strength joystic2", String.valueOf(strength));
                 //Log.d("dx joystic2", String.valueOf(dx));
                 //Log.d("dy joystic2", String.valueOf(dx));
-                rc();
+               // rc();
 
             }
         });
@@ -154,6 +167,33 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
             }
         });
         Initialize();
+    }
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    public void sendControllerUpdate()
+    {
+
+        float boost = 0.0f;
+
+
+        //var limit = 1.0f;//Slow down while testing.
+        //rx = rx * limit;
+        //ry = ry * limit;
+
+        float rx =(joystick.getNormalizedX() - 50) * 2;
+        float ry =-(joystick.getNormalizedY() - 50) * 2;
+        float lx =(joystick1.getNormalizedX() - 50) * 2;
+        float ly = -(joystick1.getNormalizedY() - 50) * 2;
+
+        //Console.WriteLine(controllerState.rx + " " + controllerState.ry + " " + controllerState.lx + " " + controllerState.ly + " SP:"+boost);
+        byte[] packet = createJoyPacket(rx, ry, lx, ly, boost);
+
+            SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay=new SendOneBytePacketWithoutReplay();
+            sendOneBytePacketWithoutReplay.execute(packet);
+
+
+
+
+
     }
 
     public void Initialize() {
@@ -275,11 +315,13 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         }
     }
 
-    public class SendBytesWithoutReplay extends AsyncTask<byte[], Byte[], String> {
+
+    public class SendOneBytePacketWithoutReplay extends AsyncTask<byte[], String, String> {
+
+
 
         @Override
         protected String doInBackground(byte[]... bytes) {
-
             byte[] buf = bytes[0];
             DatagramPacket packet = new DatagramPacket(buf, buf.length, inetAddressMainSending, portMainSending);
             try {
@@ -298,9 +340,8 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         protected void onPostExecute(String s) {
             super.onPostExecute(s);
         }
-
-
     }
+
 
 
 
@@ -308,9 +349,11 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
 
 
         try {
+            String connectstring= "conn_req:\\x00\\x00";
 
-
-
+            byte[] connectPacket =connectstring.getBytes(StandardCharsets.UTF_8);
+            connectPacket[connectPacket.length - 2] = (byte) 0x96;
+            connectPacket[connectPacket.length - 1] = (byte) 0x17;
             SendOneCommandwithoutreplay sendOneCommand = new SendOneCommandwithoutreplay();
             sendOneCommand.doInBackground("command");
 
@@ -319,6 +362,57 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
         }
     }
 
+
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    private static byte[] createJoyPacket(float fRx, float fRy, float fLx, float fLy, float speed)
+    {
+        //template joy packet.
+       byte[] packet = new byte[] {(byte) 0xcc, (byte) 0xb0, 0x00, 0x7f, 0x60, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12, 0x16, 0x01, 0x0e, 0x00, 0x25, 0x54 };
+
+        short axis1 = (short)(660.0F * fRx + 1024.0F);//RightX center=1024 left =364 right =-364
+        short axis2 = (short)(660.0F * fRy + 1024.0F);//RightY down =364 up =-364
+        short axis3 = (short)(660.0F * fLy + 1024.0F);//LeftY down =364 up =-364
+        short axis4 = (short)(660.0F * fLx + 1024.0F);//LeftX left =364 right =-364
+        short axis5 = (short)(660.0F * speed + 1024.0F);//Speed.
+
+        if (speed > 0.1f)
+            axis5 = 0x7fff;
+
+        long packedAxis = ((long)axis1 & 0x7FF) | (((long)axis2 & 0x7FF) << 11) | ((0x7FF & (long)axis3) << 22) | ((0x7FF & (long)axis4) << 33) | ((long)axis5 << 44);
+        packet[9] = ((byte)(int)(0xFF & packedAxis));
+        packet[10] = ((byte)(int)(packedAxis >> 8 & 0xFF));
+        packet[11] = ((byte)(int)(packedAxis >> 16 & 0xFF));
+        packet[12] = ((byte)(int)(packedAxis >> 24 & 0xFF));
+        packet[13] = ((byte)(int)(packedAxis >> 32 & 0xFF));
+        packet[14] = ((byte)(int)(packedAxis >> 40 & 0xFF));
+
+        //Add time info.
+
+        packet[15] = (byte)Calendar.getInstance().get(Calendar.HOUR);;
+        packet[16] = (byte)Calendar.getInstance().get(Calendar.MINUTE);
+        packet[17] = (byte)Calendar.getInstance().get(Calendar.SECOND);
+        packet[18] = (byte)(Calendar.getInstance().getTimeInMillis() & 0xff);
+        packet[19] = (byte)(Calendar.getInstance().getTimeInMillis() >> 8);
+
+        CRC.calcUCRC(packet, 4);//Not really needed.
+
+        //calc crc for packet.
+        CRC.calcCrc(packet, packet.length);
+
+        return packet;
+    }
+
+    private static void setPacketSequence(byte[] packet)
+    {
+        packet[7] = (byte)(sequence & 0xff);
+        packet[8] = (byte)((sequence >> 8) & 0xff);
+        sequence++;
+    }
+    private static void setPacketCRCs(byte[] packet)
+    {
+        CRC.calcUCRC(packet, 4);
+        CRC.calcCrc(packet, packet.length);
+    }
     public void takeoff() {
 
 
@@ -326,8 +420,13 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
 
 
 
-            SendOneCommandwithoutreplay sendOneCommand = new SendOneCommandwithoutreplay();
-            sendOneCommand.doInBackground("takeoff");
+         //   SendOneCommandwithoutreplay sendOneCommand = new SendOneCommandwithoutreplay();
+         //   sendOneCommand.doInBackground("takeoff");
+            byte[] packet = new byte[] {(byte) 0xcc, 0x58, 0x00, 0x7c, 0x68, 0x54, 0x00, (byte) 0xe4, 0x01, (byte) 0xc2, 0x16 };
+            setPacketSequence(packet);
+            setPacketCRCs(packet);
+            SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
+            sendOneBytePacketWithoutReplay.execute(packet);
 
 
         } catch (Exception e) {
@@ -344,6 +443,7 @@ public class MainActivity extends AppCompatActivity implements TextureView.Surfa
             decoderView.decode();
         }catch (Exception e){e.printStackTrace();}
     }
+
 
     public void streamon() {
 
