@@ -73,9 +73,8 @@ public class DecoderView extends SurfaceView {
     }
 
 
-    public void decode() {
+    public void decode(byte[] array) {
         Log.d("decode", "decode");
-        byte[] array = MainActivity.lmessage;
         if (bConfigured == false) {
             Init();
         }

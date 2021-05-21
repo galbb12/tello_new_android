@@ -24,6 +24,7 @@ import android.widget.ImageView;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -31,6 +32,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -46,7 +48,7 @@ import java.lang.*;
 
 
 public class MainActivity extends AppCompatActivity{
-    public static byte[] lmessage = new byte[2048];
+
     public static final int TELLO_CAM_LISTEN_PORT = 11111;
     String output;
     Button streamon;
@@ -284,16 +286,16 @@ public class MainActivity extends AppCompatActivity{
         }
     }
 
-    void handle(byte[] message) {
-        try {
-            //   ByteBuffer bb =message; // Your frame data is stored in this buffer
-            //   Picture real = decoder.decodeFrame(bb, out.getData());
-            //   Bitmap bi = AndroidUtil.toBitmap(real); // If you prefere AWT image
-            //   imageView.setImageBitmap(bi);
-            DecoderView imageView=findViewById(R.id.decoderView);
-            decoderView.decode();
-        }catch (Exception e){e.printStackTrace();}
-    }
+
+
+
+
+
+
+
+
+
+
 
     public void streamon() {
 
@@ -343,10 +345,25 @@ public class MainActivity extends AppCompatActivity{
 
     return new_a;
     }
+
+
+    byte[] trim(byte[] bytes)
+    {
+        int i = bytes.length - 1;
+        while (i >= 0 && bytes[i] == 0)
+        {
+            --i;
+        }
+
+        return Arrays.copyOf(bytes, i + 1);
+    }
+
     private class VideoDatagramReceiver extends Thread {
         private boolean bKeepRunning = true;
         private String lastMessage = "";
-        byte[] data;
+        public byte[] lmessage = new byte[1460];
+        int videoOffset=0;
+        byte[] videoFrame = new byte[1024 *100];
 
         @Override
         public void run() {
@@ -359,20 +376,27 @@ public class MainActivity extends AppCompatActivity{
                 while(bKeepRunning) {
 
                     socketStreamOnServer.receive(packet);
-                    data= add(data,lmessage);
-                    if(data!=null){
-                    Log.d("video length", String.valueOf(new String(data, 0, data.length).trim().length()));}
+                    byte[] data = new byte[packet.getLength()];
+                    System.arraycopy(packet.getData(), 0, data, 0, packet.getLength());
+
+                    Log.d("video length", String.valueOf(data.length));
 
                     try{
-                        if(packet.getData()!=null){
-                            DecoderView imageView=findViewById(R.id.decoderView);
-                            imageView.decode();
-                        }else{
-                            Log.d("video packet","video packet is null");
-                        }
 
-                    }catch (RuntimeException e){Log.e("error",e.toString());}
 
+                            if (videoOffset > 0) {
+                                DecoderView imageView = findViewById(R.id.decoderView);
+                                imageView.decode(Arrays.copyOfRange(videoFrame, 0, videoOffset));
+                                Log.d("frame length", String.valueOf(Arrays.copyOfRange(videoFrame, 0, videoOffset).length));
+                                videoOffset = 0;
+                            }
+                            System.arraycopy(data, 2, videoFrame, videoOffset, (data.length- 2));
+                            videoOffset +=  data.length - 2;
+                            Log.d("videoOffset", String.valueOf(videoOffset));
+
+
+                    }catch (RuntimeException e){Log.e("error",e.toString());
+                   }
 
 
 
