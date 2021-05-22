@@ -3,6 +3,7 @@ package com.gal.tello;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -16,6 +17,7 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
 
@@ -54,18 +56,11 @@ public class MainActivity extends AppCompatActivity{
     Button streamon;
     Button takeoff;
     Button land;
-    Button stopffmpegtask;
-    TextureView textureView;
 
-    // DecoderView decoderView = new DecoderView();
-    private byte[] sps = new byte[] {(byte) 0, (byte)0,(byte) 0,(byte) 1,(byte) 103,(byte) 77, (byte)64,(byte) 40,(byte) 149, (byte)160, (byte)60,(byte) 5,(byte) 185 };
-    private boolean bWaitForKeyframe = true;
 
-    //vid mode sps
-    private byte[] vidSps = new byte[] { (byte)0,(byte) 0, (byte)0, (byte)1, (byte)103, (byte)77,(byte) 64,(byte) 40,(byte) 149, (byte)160,(byte) 20,(byte) 1, (byte)110, (byte)64 };
 
-    private byte[] pps = { (byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
-    //FFtask fftask;
+
+
     private MediaCodec m_codec;// Media decoder
     private DatagramSocket socketMainSending;
     private InetAddress inetAddressMainSending;
@@ -78,12 +73,15 @@ public class MainActivity extends AppCompatActivity{
     public static final int portMainVideo = 11111;
     double a=0, b=0, c=0, d=0;
     DecoderView decoderView;
-
+    static Activity activity;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        getSupportActionBar().hide();
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        activity= (Activity) MainActivity.this;
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
         StrictMode.setThreadPolicy(policy);
         final JoystickView joystick = (JoystickView) findViewById(R.id.joystickView);
@@ -92,24 +90,6 @@ public class MainActivity extends AppCompatActivity{
         land=findViewById(R.id.Land);
         streamon=findViewById(R.id.StremOn);
         //textureView=findViewById(R.id.textureView);
-        stopffmpegtask=findViewById(R.id.stop_ffmpeg_task);
-        joystick.setOnMoveListener(new JoystickView.OnMoveListener() {
-            @Override
-            public void onMove(int angle, int strength) {
-                // double theta = angle * PI / 180;
-                // int dx = (int) (strength*cos(theta));
-                // int dy = (int) (strength * sin(theta));
-                a = (joystick.getNormalizedX() - 50) * 2;
-                b = -(joystick.getNormalizedY() - 50) * 2;
-                // a=dx;
-                // b=dy;
-                // Log.d("dx joystic1", String.valueOf(dx));
-                // Log.d("dy joystic1", String.valueOf(dx));
-                d = (joystick1.getNormalizedX() - 50) * 2;
-                c = -(joystick1.getNormalizedY() - 50) * 2;
-                rc();
-            }
-        });
         joystick1.setOnMoveListener(new JoystickView.OnMoveListener() {
             @Override
             public void onMove(int angle, int strength) {
@@ -146,13 +126,6 @@ public class MainActivity extends AppCompatActivity{
             @Override
             public void onClick(View view) {
                 streamon();
-            }
-        });
-        stopffmpegtask.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                //    if(fftask!=null){
-                //    fftask.sendQuitSignal();}
             }
         });
         Initialize();

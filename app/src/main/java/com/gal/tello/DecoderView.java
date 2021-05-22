@@ -1,16 +1,20 @@
 package com.gal.tello;
 
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.media.MediaCrypto;
 import android.media.MediaFormat;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.MediaStore;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.TextureView;
+import android.view.WindowManager;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -31,21 +35,24 @@ public class DecoderView extends SurfaceView {
     private byte[] pps = {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
     private int decoderWidth = 960;
     private int decoderHeight = 720;
+    Context CONTEXT;
 
 
     public DecoderView(Context context, AttributeSet attributeSet) {
         super(context,attributeSet);
+        CONTEXT=context;
         Initialize();
 
 
+
     }
 
 
-    public void test() {
-        Log.d("test", "test");
-    }
+
+
 
     private void Init() {
+        SurfaceView surfaceView=this;
         if (sps.length == 14)
             decoderWidth = 1280;
         else
@@ -68,6 +75,31 @@ public class DecoderView extends SurfaceView {
             //handle
             ex.printStackTrace();
         }
+        (MainActivity.activity).runOnUiThread(new Runnable() {
+            public void run() {
+                //Code goes here
+                int videoWidth = decoderWidth;
+                int videoHeight = decoderHeight;
+                float videoProportion = (float) videoWidth / (float) videoHeight;
+                WindowManager windowManager = (WindowManager) CONTEXT.getSystemService(Context.WINDOW_SERVICE);
+
+                // Get the width of the screen
+                int screenWidth =  windowManager.getDefaultDisplay().getWidth();
+                int screenHeight = windowManager.getDefaultDisplay().getHeight();
+                float screenProportion = (float) screenWidth / (float) screenHeight;
+
+                // Get the SurfaceView layout parameters
+                android.view.ViewGroup.LayoutParams lp = surfaceView.getLayoutParams();
+                if (videoProportion > screenProportion) {
+                    lp.width = screenWidth;
+                    lp.height = (int) ((float) screenWidth / videoProportion);
+                } else {
+                    lp.width = (int) (videoProportion * (float) screenHeight);
+                    lp.height = screenHeight;
+                }
+                // Commit the layout parameters
+                surfaceView.setLayoutParams(lp);}});
+
         return;
 
     }
