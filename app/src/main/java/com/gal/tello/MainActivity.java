@@ -393,18 +393,13 @@ public class MainActivity extends AppCompatActivity{
                     Log.d("video length", String.valueOf(data.length));
 
                     try{
+                        videoFrame=addAll(videoFrame,data);
                         if(data.length!=1460&&videoFrame!=null){
                          DecoderView imageView = findViewById(R.id.decoderView);
                          imageView.decode(videoFrame);
                          videoFrame=new byte[1460*100];
-                            videoFrame=null;
+                            videoFrame=null;}
 
-
-                        }else{
-                            videoFrame=addAll(videoFrame,data);
-
-
-                        }
 
 
 
