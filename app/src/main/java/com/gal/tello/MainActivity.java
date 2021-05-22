@@ -358,12 +358,23 @@ public class MainActivity extends AppCompatActivity{
         return Arrays.copyOf(bytes, i + 1);
     }
 
+    public static byte[] addAll(final byte[] array1, byte[] array2) {
+        if(array1==null){
+       byte[] joinedArray=array2;
+            return joinedArray;}
+        else if(array2==null){
+            byte[] joinedArray=array1;
+            return joinedArray;
+        }else{   byte[] joinedArray = Arrays.copyOf(array1, array1.length + array2.length);
+            System.arraycopy(array2, 0, joinedArray, array1.length, array2.length);
+            return joinedArray;}
+    }
+
     private class VideoDatagramReceiver extends Thread {
         private boolean bKeepRunning = true;
         private String lastMessage = "";
         public byte[] lmessage = new byte[1460];
-        int videoOffset=0;
-        byte[] videoFrame = new byte[1024 *100];
+        byte[] videoFrame;
 
         @Override
         public void run() {
@@ -382,17 +393,24 @@ public class MainActivity extends AppCompatActivity{
                     Log.d("video length", String.valueOf(data.length));
 
                     try{
+                        if(data.length!=1460&&videoFrame!=null){
+                         DecoderView imageView = findViewById(R.id.decoderView);
+                         imageView.decode(videoFrame);
+                         videoFrame=new byte[1460*100];
+                            videoFrame=null;
 
 
-                            if (videoOffset > 0) {
-                                DecoderView imageView = findViewById(R.id.decoderView);
-                                imageView.decode(Arrays.copyOfRange(videoFrame, 0, videoOffset));
-                                Log.d("frame length", String.valueOf(Arrays.copyOfRange(videoFrame, 0, videoOffset).length));
-                                videoOffset = 0;
-                            }
-                            System.arraycopy(data, 2, videoFrame, videoOffset, (data.length- 2));
-                            videoOffset +=  data.length - 2;
-                            Log.d("videoOffset", String.valueOf(videoOffset));
+                        }else{
+                            videoFrame=addAll(videoFrame,data);
+
+
+                        }
+
+
+
+
+
+
 
 
                     }catch (RuntimeException e){Log.e("error",e.toString());
