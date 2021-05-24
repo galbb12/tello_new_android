@@ -1,6 +1,7 @@
 package com.gal.tello;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.app.Activity;
@@ -10,11 +11,13 @@ import android.graphics.BitmapFactory;
 import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.StrictMode;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.Xml;
 import android.view.TextureView;
 import android.view.View;
 import android.view.WindowManager;
@@ -34,6 +37,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -56,24 +60,31 @@ public class MainActivity extends AppCompatActivity{
     Button streamon;
     Button takeoff;
     Button land;
-
-
-
-
-
+    public boolean isPaused = false;
+    private static int sequence = 1;
     private MediaCodec m_codec;// Media decoder
     private DatagramSocket socketMainSending;
     private InetAddress inetAddressMainSending;
     public static final int portMainSending = 8889;
     public static final String addressMainSending = "192.168.10.1";
-
+    int picMode;
     DatagramSocket socketStatusServer;
     DatagramSocket socketStreamOnServer;
     private static final String SAMPLE_URL = "udp://@0.0.0.0:11111";
     public static final int portMainVideo = 11111;
-    double a=0, b=0, c=0, d=0;
-    DecoderView decoderView;
+    float a=0, b=0, c=0, d=0;
     static Activity activity;
+    int speed=1;
+    ControllerState controllerState;
+    void StarListeningForDevice() throws IOException {
+
+        if(inetAddressMainSending.isReachable(2000)){
+
+
+
+        }
+
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -84,28 +95,52 @@ public class MainActivity extends AppCompatActivity{
         activity= (Activity) MainActivity.this;
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
         StrictMode.setThreadPolicy(policy);
-        final JoystickView joystick = (JoystickView) findViewById(R.id.joystickView);
-        final JoystickView joystick1 = (JoystickView) findViewById(R.id.joystickView1);
+        final JoystickView joystickr = (JoystickView) findViewById(R.id.joystickView);
+        final JoystickView joystickl = (JoystickView) findViewById(R.id.joystickView1);
         takeoff=findViewById(R.id.TakeOff);
         land=findViewById(R.id.Land);
         streamon=findViewById(R.id.StremOn);
         //textureView=findViewById(R.id.textureView);
-        joystick1.setOnMoveListener(new JoystickView.OnMoveListener() {
+        controllerState=new ControllerState();
+        joystickl.setOnMoveListener(new JoystickView.OnMoveListener() {
+            @RequiresApi(api = Build.VERSION_CODES.O)
             @Override
             public void onMove(int angle, int strength) {
-                a = (joystick.getNormalizedX() - 50) * 2;
-                b = -(joystick.getNormalizedY() - 50) * 2;
-                //double theta = angle * PI /180;
-                //int dx = (int) (100*cos(theta));
-                //int dy = (int) (100 * sin(theta));
-                d = (joystick1.getNormalizedX() - 50) * 2;
-                c = -(joystick1.getNormalizedY() - 50) * 2;
+                float deadBand = 0.15f;
+                float rx =Math.abs(joystickr.getNormalizedX()-50.0f)/50.0f< deadBand ? 0.0f : (joystickr.getNormalizedX()-50.0f)/50.0f;
+                float ry =Math.abs(joystickr.getNormalizedY()-50.0f)/50.0f< deadBand ? 0.0f : (joystickr.getNormalizedY()-50.0f)/50.0f;
+                float lx =Math.abs(joystickl.getNormalizedX()-50.0f)/50.0f< deadBand ? 0.0f : (joystickl.getNormalizedX()-50.0f)/50.0f;
+                float ly =Math.abs(joystickl.getNormalizedY()-50.0f)/50.0f< deadBand ? 0.0f : (joystickl.getNormalizedY()-50.0f)/50.0f;
+                Log.d("joystick","rx: "+rx+" "+"ry: "+ry+" "+"lx: "+lx+" "+"ly: "+ly);
+                        //d=dx;
+                        //c=dy;
+                        //Log.d("strength joystic2", String.valueOf(strength));
+                        //Log.d("dx joystic2", String.valueOf(dx));
+                        //Log.d("dy joystic2", String.valueOf(dx));
+                        //rc();
+                        controllerState.setAxis(lx, -ly, rx, -ry);
+                sendControllerUpdate();
+
+            }
+        });
+        joystickr.setOnMoveListener(new JoystickView.OnMoveListener() {
+            @RequiresApi(api = Build.VERSION_CODES.O)
+            @Override
+            public void onMove(int angle, int strength) {
+                float deadBand = 0.15f;
+                float rx =Math.abs(joystickr.getNormalizedX()-50.0f)/50.0f< deadBand ? 0.0f : (joystickr.getNormalizedX()-50.0f)/50.0f;
+                float ry =Math.abs(joystickr.getNormalizedY()-50.0f)/50.0f< deadBand ? 0.0f : (joystickr.getNormalizedY()-50.0f)/50.0f;
+                float lx =Math.abs(joystickl.getNormalizedX()-50.0f)/50.0f< deadBand ? 0.0f : (joystickl.getNormalizedX()-50.0f)/50.0f;
+                float ly =Math.abs(joystickl.getNormalizedY()-50.0f)/50.0f< deadBand ? 0.0f : (joystickl.getNormalizedY()-50.0f)/50.0f;
+                Log.d("joystick","rx: "+rx+" "+"ry: "+ry+" "+"lx: "+lx+" "+"ly: "+ly);
                 //d=dx;
                 //c=dy;
                 //Log.d("strength joystic2", String.valueOf(strength));
                 //Log.d("dx joystic2", String.valueOf(dx));
                 //Log.d("dy joystic2", String.valueOf(dx));
-                rc();
+                //rc();
+                controllerState.setAxis(lx, -ly, rx, -ry);
+                sendControllerUpdate();
 
             }
         });
@@ -200,11 +235,100 @@ public class MainActivity extends AppCompatActivity{
         }
     }
 
-    public class SendBytesWithoutReplay extends AsyncTask<byte[], Byte[], String> {
+     void setVideoBitRate(int rate)
+    {
+        //                                          crc    typ  cmdL  cmdH  seqL  seqH  rateL  crc   crc
+        byte[] packet = new byte[] {(byte) 0xcc, 0x60, 0x00, 0x27, 0x68, 0x20, 0x00, 0x09, 0x00, 0x00, 0x5b, (byte) 0xc5};
+
+        //payload
+        packet[9] = (byte)rate;
+
+        setPacketSequence(packet);
+        setPacketCRCs(packet);
+
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay= new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(packet);
+    }
+     void setVideoDynRate(int rate)
+    {
+        //                                          crc    typ  cmdL  cmdH  seqL  seqH  rateL  crc   crc
+        byte[] packet = new byte[] {(byte) 0xcc, 0x60, 0x00, 0x27, 0x68, 0x21, 0x00, 0x09, 0x00, 0x00, 0x5b, (byte) 0xc5};
+
+        //payload
+        packet[9] = (byte)rate;
+
+        setPacketSequence(packet);
+        setPacketCRCs(packet);
+
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay= new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(packet);
+    }
+    void setVideoRecord(int n)
+    {
+        //                                          crc    typ  cmdL  cmdH  seqL  seqH  nL  crc   crc
+        byte[] packet = new byte[] {(byte) 0xcc, 0x60, 0x00, 0x27, 0x68, 0x32, 0x00, 0x09, 0x00, 0x00, 0x5b, (byte) 0xc5};
+
+        //payload
+        packet[9] = (byte)n;
+
+        setPacketSequence(packet);
+        setPacketCRCs(packet);
+
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay= new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(packet);
+    }
+    /*TELLO_CMD_SWITCH_PICTURE_VIDEO
+    49 0x31
+    0x68
+    switching video stream mode
+    data: u8 (1=video, 0=photo)
+    */
+    void setPicVidMode(int mode)
+    {
+        //                                          crc    typ  cmdL  cmdH  seqL  seqH  modL  crc   crc
+        byte[] packet = new byte[] {(byte) 0xcc, 0x60, 0x00, 0x27, 0x68, 0x31, 0x00, 0x00, 0x00, 0x00, 0x5b, (byte) 0xc5};
+
+        picMode = mode;
+
+        //payload
+        packet[9] = (byte)(mode & 0xff);
+
+        setPacketSequence(packet);
+        setPacketCRCs(packet);
+
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay= new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(packet);
+    }
+    void setEV(int ev)
+    {
+        //                                          crc    typ  cmdL  cmdH  seqL  seqH  evL  crc   crc
+        byte[] packet = new byte[] {(byte) 0xcc, 0x60, 0x00, 0x27, 0x68, 0x34, 0x00, 0x09, 0x00, 0x00, 0x5b, (byte) 0xc5};
+
+        byte evb = (byte)(ev-9);//Exposure goes from -9 to +9
+        //payload
+        packet[9] = evb;
+
+        setPacketSequence(packet);
+        setPacketCRCs(packet);
+
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay= new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(packet);
+    }
+
+    void requestIframe()
+    {
+        byte[] iframePacket = new byte[] {(byte) 0xcc, 0x58, 0x00, 0x7c, 0x60, 0x25, 0x00, 0x00, 0x00, 0x6c, (byte) 0x95};
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay= new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(iframePacket);
+
+    }
+
+    public class SendOneBytePacketWithoutReplay extends AsyncTask<byte[], String, String> {
+
+
 
         @Override
         protected String doInBackground(byte[]... bytes) {
-
             byte[] buf = bytes[0];
             DatagramPacket packet = new DatagramPacket(buf, buf.length, inetAddressMainSending, portMainSending);
             try {
@@ -223,8 +347,6 @@ public class MainActivity extends AppCompatActivity{
         protected void onPostExecute(String s) {
             super.onPostExecute(s);
         }
-
-
     }
 
 
@@ -233,9 +355,11 @@ public class MainActivity extends AppCompatActivity{
 
 
         try {
+            String connectstring= "conn_req:\\x00\\x00";
 
-
-
+            byte[] connectPacket =connectstring.getBytes(StandardCharsets.UTF_8);
+            connectPacket[connectPacket.length - 2] = (byte) 0x96;
+            connectPacket[connectPacket.length - 1] = (byte) 0x17;
             SendOneCommandwithoutreplay sendOneCommand = new SendOneCommandwithoutreplay();
             sendOneCommand.doInBackground("command");
 
@@ -251,12 +375,28 @@ public class MainActivity extends AppCompatActivity{
 
 
 
-            SendOneCommandwithoutreplay sendOneCommand = new SendOneCommandwithoutreplay();
-            sendOneCommand.doInBackground("takeoff");
+            //   SendOneCommandwithoutreplay sendOneCommand = new SendOneCommandwithoutreplay();
+            //   sendOneCommand.doInBackground("takeoff");
+            byte[] packet = new byte[] {(byte) 0xcc, 0x58, 0x00, 0x7c, 0x68, 0x54, 0x00, (byte) 0xe4, 0x01, (byte) 0xc2, 0x16 };
+            setPacketSequence(packet);
+            setPacketCRCs(packet);
+            SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
+            sendOneBytePacketWithoutReplay.execute(packet);
 
 
         } catch (Exception e) {
         }
+    }
+    private static void setPacketSequence(byte[] packet)
+    {
+        packet[7] = (byte)(sequence & 0xff);
+        packet[8] = (byte)((sequence >> 8) & 0xff);
+        sequence++;
+    }
+    private static void setPacketCRCs(byte[] packet)
+    {
+        CRC.calcUCRC(packet, 4);
+        CRC.calcCrc(packet, packet.length);
     }
 
 
@@ -268,7 +408,123 @@ public class MainActivity extends AppCompatActivity{
 
 
 
+    public static float Clamp(float val, float min, float max) {
+        return Math.max(min, Math.min(max, val));
+    }
 
+     @RequiresApi(api = Build.VERSION_CODES.O)
+     void sendControllerUpdate()
+    {
+        //if (!connected)
+        //    return;
+
+        float boost = 0.0f;
+        if (speed > 0)
+            boost = 1.0f;
+
+        //var limit = 1.0f;//Slow down while testing.
+        //rx = rx * limit;
+        //ry = ry * limit;
+        float rx =controllerState.rx;
+        float ry =controllerState.ry;
+        float lx =controllerState.lx;
+        float ly =controllerState.ly;
+       // if (true)//Combine autopilot sticks.
+       // {
+       //     rx = Clamp(rx + autoPilotControllerState.rx, -1.0f, 1.0f);
+       //     ry = Clamp(ry + autoPilotControllerState.ry, -1.0f, 1.0f);
+       //     lx = Clamp(lx + autoPilotControllerState.lx, -1.0f, 1.0f);
+       //     ly = Clamp(ly + autoPilotControllerState.ly, -1.0f, 1.0f);
+       // }
+        //Console.WriteLine(controllerState.rx + " " + controllerState.ry + " " + controllerState.lx + " " + controllerState.ly + " SP:"+boost);
+        byte[] packet = createJoyPacket(rx, ry, lx, ly, boost);
+        try
+        {
+            SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay=new SendOneBytePacketWithoutReplay();
+            sendOneBytePacketWithoutReplay.execute(packet);
+        }catch (Exception ex)
+        {
+
+        }
+    }
+
+    public class ControllerState
+    {
+        public float rx, ry, lx, ly;
+        public int speed;
+        public double deadBand = 0.15;
+        public void setAxis(float lx, float ly,float rx, float ry)
+        {
+            //var deadBand = 0.15f;
+            //this.rx = Math.Abs(rx) < deadBand ? 0.0f : rx;
+            //this.ry = Math.Abs(ry) < deadBand ? 0.0f : ry;
+            //this.lx = Math.Abs(lx) < deadBand ? 0.0f : lx;
+            //this.ly = Math.Abs(ly) < deadBand ? 0.0f : ly;
+
+            this.rx = rx;
+            this.ry = ry;
+            this.lx = lx;
+            this.ly = ly;
+
+            //Console.WriteLine(rx + " " + ry + " " + lx + " " + ly + " SP:" + speed);
+        }
+        public void setSpeedMode(int mode)
+        {
+            speed = mode;
+
+            //Console.WriteLine(rx + " " + ry + " " + lx + " " + ly + " SP:" + speed);
+        }
+    }
+
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    byte[] createJoyPacket(float fRx, float fRy, float fLx, float fLy, float speed)
+    {
+        //template joy packet.
+        byte[] packet = new byte[] {(byte) 0xcc, (byte) 0xb0, 0x00, 0x7f, 0x60, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12, 0x16, 0x01, 0x0e, 0x00, 0x25, 0x54 };
+
+        short axis1 = (short)(660.0F * fRx + 1024.0F);//RightX center=1024 left =364 right =-364
+        short axis2 = (short)(660.0F * fRy + 1024.0F);//RightY down =364 up =-364
+        short axis3 = (short)(660.0F * fLy + 1024.0F);//LeftY down =364 up =-364
+        short axis4 = (short)(660.0F * fLx + 1024.0F);//LeftX left =364 right =-364
+        short axis5 = (short)(660.0F * speed + 1024.0F);//Speed.
+
+        if (speed > 0.1f)
+            axis5 = 0x7fff;
+
+        long packedAxis = ((long)axis1 & 0x7FF) | (((long)axis2 & 0x7FF) << 11) | ((0x7FF & (long)axis3) << 22) | ((0x7FF & (long)axis4) << 33) | ((long)axis5 << 44);
+        packet[9] = ((byte)(int)(0xFF & packedAxis));
+        packet[10] = ((byte)(int)(packedAxis >> 8 & 0xFF));
+        packet[11] = ((byte)(int)(packedAxis >> 16 & 0xFF));
+        packet[12] = ((byte)(int)(packedAxis >> 24 & 0xFF));
+        packet[13] = ((byte)(int)(packedAxis >> 32 & 0xFF));
+        packet[14] = ((byte)(int)(packedAxis >> 40 & 0xFF));
+
+        //Add time info.
+        LocalDateTime now = LocalDateTime.now();
+        packet[15] = (byte)now.getHour();
+        packet[16] = (byte)now.getMinute();
+        packet[17] = (byte)now.getSecond();
+        packet[18] = (byte)(now.getNano() & 0xff);
+        packet[19] = (byte)((now.getNano()*1000000) >> 8);
+
+        CRC.calcUCRC(packet, 4);//Not really needed.
+
+        //calc crc for packet.
+        CRC.calcCrc(packet, packet.length);
+
+        return packet;
+    }
+    void StartRecivingVideoStream(){
+        try {
+        socketStreamOnServer = new DatagramSocket(null);
+        InetSocketAddress addressVideo = new InetSocketAddress( 11111);
+        socketStreamOnServer.bind(addressVideo);
+        VideoDatagramReceiver videoDatagramReceiver = new VideoDatagramReceiver();
+        videoDatagramReceiver.start();}catch (Exception e){
+            e.printStackTrace();
+        }
+
+    }
 
     public void streamon() {
 
@@ -277,14 +533,23 @@ public class MainActivity extends AppCompatActivity{
 
 
 
-            //startffmpegstream();
-            SendOneCommandwithoutreplay sendOneCommand = new SendOneCommandwithoutreplay();
-            sendOneCommand.doInBackground("streamon");
-            socketStreamOnServer = new DatagramSocket(null);
-            InetSocketAddress addressVideo = new InetSocketAddress("0.0.0.0", 11111);
-            socketStreamOnServer.bind(addressVideo);
-            VideoDatagramReceiver videoDatagramReceiver = new VideoDatagramReceiver();
-            videoDatagramReceiver.start();
+
+          //  SendOneCommandwithoutreplay sendOneCommand = new SendOneCommandwithoutreplay();
+          //  sendOneCommand.doInBackground("streamon");
+          // setPicVidMode(0);
+          // setVideoBitRate(2);
+          // setVideoDynRate(1);
+          // setEV(0);
+
+            SendOneCommandwithoutreplay sendOneCommandwithoutreplay = new SendOneCommandwithoutreplay();
+            sendOneCommandwithoutreplay.execute("streamon");
+            StartRecivingVideoStream();
+
+
+
+           // requestIframe();
+
+
 
             //VideoServer videoServer= new VideoServer() {
             //    @Override
@@ -301,34 +566,6 @@ public class MainActivity extends AppCompatActivity{
 
         } catch (Exception e) {
         }
-    }
-    byte[] add (byte[] dst, byte[] source){
-        byte[] new_a;
-        if(dst!=null){
-    new_a = new byte[dst.length+source.length];
-            System.arraycopy(dst, 0, new_a, 0, dst.length); // copy a
-            System.arraycopy(source, 0, new_a, source.length, dst.length); // copy b after a
-            }
-        else {new_a = new byte[source.length];
-
-          new_a=source;
-        }
-
-
-
-    return new_a;
-    }
-
-
-    byte[] trim(byte[] bytes)
-    {
-        int i = bytes.length - 1;
-        while (i >= 0 && bytes[i] == 0)
-        {
-            --i;
-        }
-
-        return Arrays.copyOf(bytes, i + 1);
     }
 
     public static byte[] addAll(final byte[] array1, byte[] array2) {
@@ -368,10 +605,11 @@ public class MainActivity extends AppCompatActivity{
                     try{
                         videoFrame=addAll(videoFrame,data);
                         if(data.length!=1460&&videoFrame!=null){
+                            if(!isPaused){
                          DecoderView imageView = findViewById(R.id.decoderView);
                          imageView.decode(videoFrame);
                          videoFrame=new byte[1460*100];
-                            videoFrame=null;}
+                            videoFrame=null;}}
 
 
 
@@ -446,6 +684,25 @@ public class MainActivity extends AppCompatActivity{
         public void kill() {
             bKeepRunning = false;
         }
+    }
+    @Override
+    public void onPause(){
+        super.onPause();
+       DecoderView decoderView = findViewById(R.id.decoderView);
+       decoderView.stop();
+        isPaused=true;
+   //    try {
+   //        VideoDatagramReceiver videoDatagramReceiver = new VideoDatagramReceiver();
+   //        videoDatagramReceiver.kill();}catch (Exception e){
+   //        e.printStackTrace();}
+   }
+    @Override
+    public void onResume(){
+        super.onResume();
+        isPaused=false;
+       // StartRecivingVideoStream();
+
+
     }
 
 //   private class displayimage extends Thread {
@@ -537,6 +794,7 @@ public class MainActivity extends AppCompatActivity{
 ///
 //   //      }
 //   //  }
+
 
 
 

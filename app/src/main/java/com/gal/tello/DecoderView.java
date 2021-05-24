@@ -23,7 +23,6 @@ import java.nio.ByteBuffer;
 public class DecoderView extends SurfaceView {
     byte[] buffer;
     private MediaCodec codec;
-
     private boolean bConfigured;
     //pic mode sps
     private byte[] sps = new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 60, (byte) 5, (byte) 185};
