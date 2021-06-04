@@ -2,10 +2,13 @@ package com.gal.tello;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.media.MediaCrypto;
 import android.media.MediaFormat;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
@@ -16,8 +19,10 @@ import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.WindowManager;
 
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
 
 public class DecoderView extends SurfaceView {
@@ -104,6 +109,7 @@ public class DecoderView extends SurfaceView {
     }
 
 
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public void decode(byte[] array) {
         Log.d("decode", "decode");
         if (bConfigured == false) {
@@ -170,6 +176,12 @@ public class DecoderView extends SurfaceView {
                     codec.setVideoScalingMode(MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT);
 
                     i = codec.dequeueOutputBuffer(BufferInfo, 0L);
+                  //  ByteBuffer buf = codec.getOutputBuffer(-1);
+                  //  byte[] imageBytes= new byte[buf.remaining()];
+                  //  buf.get(imageBytes);
+                  //  Bitmap bitmap= BitmapFactory.decodeByteArray(imageBytes,0,imageBytes.length);
+                  //  FileOutputStream out = new FileOutputStream("");
+                  //  bitmap.compress(Bitmap.CompressFormat.PNG,100,)
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
