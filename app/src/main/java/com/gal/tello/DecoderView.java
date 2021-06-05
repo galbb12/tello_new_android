@@ -4,7 +4,11 @@ import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.ImageFormat;
+import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
+import android.graphics.YuvImage;
+import android.media.Image;
 import android.media.MediaCodec;
 import android.media.MediaCrypto;
 import android.media.MediaFormat;
@@ -14,18 +18,23 @@ import android.os.Looper;
 import android.provider.MediaStore;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.WindowManager;
+import android.widget.ImageView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
-public class DecoderView extends SurfaceView {
+public class DecoderView extends TextureView {
     byte[] buffer;
     private MediaCodec codec;
     private boolean bConfigured;
@@ -33,8 +42,6 @@ public class DecoderView extends SurfaceView {
     private byte[] sps = new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 60, (byte) 5, (byte) 185};
     private boolean bWaitForKeyframe = true;
 
-    //vid mode sps
-    private byte[] vidSps = new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 20, (byte) 1, (byte) 110, (byte) 64};
 
     private byte[] pps = {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
     private int decoderWidth = 960;
@@ -55,8 +62,9 @@ public class DecoderView extends SurfaceView {
 
 
 
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     private void Init() {
-        SurfaceView surfaceView=this;
+        TextureView textureView=this;
         if (sps.length == 14)
             decoderWidth = 1280;
         else
@@ -69,7 +77,8 @@ public class DecoderView extends SurfaceView {
         String str = videoFormat.getString("mime");
         try {
             MediaCodec cdx = MediaCodec.createDecoderByType(str);
-            cdx.configure(videoFormat, getHolder().getSurface(), (MediaCrypto) null, 0);
+            SurfaceTexture surfaceTexture = textureView.getSurfaceTexture();
+            cdx.configure(videoFormat, new Surface(surfaceTexture), (MediaCrypto) null, 0);
             cdx.start();
 
             codec = cdx;
@@ -93,7 +102,7 @@ public class DecoderView extends SurfaceView {
                 float screenProportion = (float) screenWidth / (float) screenHeight;
 
                 // Get the SurfaceView layout parameters
-                android.view.ViewGroup.LayoutParams lp = surfaceView.getLayoutParams();
+                android.view.ViewGroup.LayoutParams lp = textureView.getLayoutParams();
                 if (videoProportion > screenProportion) {
                     lp.width = screenWidth;
                     lp.height = (int) ((float) screenWidth / videoProportion);
@@ -102,7 +111,7 @@ public class DecoderView extends SurfaceView {
                     lp.height = screenHeight;
                 }
                 // Commit the layout parameters
-                surfaceView.setLayoutParams(lp);}});
+                textureView.setLayoutParams(lp);}});
 
         return;
 
@@ -182,6 +191,17 @@ public class DecoderView extends SurfaceView {
                   //  Bitmap bitmap= BitmapFactory.decodeByteArray(imageBytes,0,imageBytes.length);
                   //  FileOutputStream out = new FileOutputStream("");
                   //  bitmap.compress(Bitmap.CompressFormat.PNG,100,)
+
+                   //Image image = codec.getOutputImage(0);
+                  //  YuvImage yuvImage = new YuvImage(YUV_420_888toNV21(image), ImageFormat.NV21, decoderWidth,decoderHeight, null);
+                  //  ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                  //  yuvImage.compressToJpeg(new Rect(0, 0, decoderWidth, decoderHeight), 80, stream);
+                  //  Bitmap bitmap = BitmapFactory.decodeByteArray(stream.toByteArray(), 0, stream.size());
+                  //  try {
+                  //      stream.close();
+                  //  } catch (IOException e) {
+                  //      e.printStackTrace();
+                  //  }
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -212,6 +232,21 @@ public class DecoderView extends SurfaceView {
             }
         }
         codec = null;
+    }
+    private static byte[] YUV_420_888toNV21(Image image) {
+        byte[] nv21;
+        ByteBuffer yBuffer = image.getPlanes()[0].getBuffer();
+        ByteBuffer uBuffer = image.getPlanes()[1].getBuffer();
+        ByteBuffer vBuffer = image.getPlanes()[2].getBuffer();
+        int ySize = yBuffer.remaining();
+        int uSize = uBuffer.remaining();
+        int vSize = vBuffer.remaining();
+        nv21 = new byte[ySize + uSize + vSize];
+        //U and V are swapped
+        yBuffer.get(nv21, 0, ySize);
+        vBuffer.get(nv21, ySize, vSize);
+        uBuffer.get(nv21, ySize + vSize, uSize);
+        return nv21;
     }
 
 

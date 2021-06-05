@@ -5,6 +5,7 @@ import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.app.Activity;
+import android.app.usage.ExternalStorageStats;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -13,6 +14,7 @@ import android.media.MediaCodec;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.StrictMode;
 import android.util.AttributeSet;
@@ -30,6 +32,7 @@ import com.google.common.primitives.Ints;
 
 import java.io.Console;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.net.DatagramPacket;
@@ -63,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
     public static final int TELLO_CAM_LISTEN_PORT = 11111;
     Boolean VideoStarted = false;
     Button streamon;
+    Bitmap b;
     Button takeoff;
     Button land;
     public boolean isPaused = false;
@@ -77,13 +81,12 @@ public class MainActivity extends AppCompatActivity {
     DatagramSocket socketStreamOnServer;
     private static final String SAMPLE_URL = "udp://@0.0.0.0:11111";
     public static final int portMainVideo = 11111;
-    float a = 0, b = 0, c = 0, d = 0;
     static Activity activity;
     int speed = 1;
     static ControllerState controllerState;
     static JoystickView joystickr;
     static JoystickView joystickl;
-    int iFrameRate = 7;
+    int iFrameRate = 10;
 
     void StarListeningForDevice() throws IOException {
 
@@ -642,6 +645,7 @@ public class MainActivity extends AppCompatActivity {
         byte[] videoFrame = new byte[100 * 1024];
         int videoOffset = 0;
 
+        @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
         @Override
         public void run() {
             Log.d("video start", "start");
@@ -666,6 +670,8 @@ public class MainActivity extends AppCompatActivity {
                                     byte[] videoFramenew = new byte[videoOffset];
                                     System.arraycopy(videoFrame, 0, videoFramenew, 0, videoOffset);
                                     imageView.decode(videoFramenew);
+                                    b= imageView.getBitmap();
+                                   // b.compress(Bitmap.CompressFormat.PNG,0, new FileOutputStream(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toString()+System.nanoTime()+"/tello.png") );
                                     videoOffset = 0;
                                     // videoFrame = new byte[1460 * 100];
                                 }
@@ -736,15 +742,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    public void rc() {
+  // public void rc() {
 
-       /* if(a==70&&b==-70&&c==-70&&d==-70){
-        Log.d("startmotors","motorstart");}
-        else{*/
-        SendOneCommandwithoutreplay sendOneCommand = new SendOneCommandwithoutreplay();
-        sendOneCommand.doInBackground("rc " + a + " " + b + " " + c + " " + d);
-        // }
-    }
+  //    /* if(a==70&&b==-70&&c==-70&&d==-70){
+  //     Log.d("startmotors","motorstart");}
+  //     else{*/
+  //     SendOneCommandwithoutreplay sendOneCommand = new SendOneCommandwithoutreplay();
+  //     sendOneCommand.doInBackground("rc " + a + " " + b + " " + c + " " + d);
+  //     // }
+  // }
 
     private class StatusDatagramReceiver extends Thread {
         private boolean bKeepRunning = true;
