@@ -86,7 +86,7 @@ public class MainActivity extends AppCompatActivity {
     static ControllerState controllerState;
     static JoystickView joystickr;
     static JoystickView joystickl;
-    int iFrameRate = 10;
+    int iFrameRate = 8;
 
     void StarListeningForDevice() throws IOException {
 
@@ -113,50 +113,50 @@ public class MainActivity extends AppCompatActivity {
         streamon = findViewById(R.id.StremOn);
         //textureView=findViewById(R.id.textureView);
         controllerState = new ControllerState();
-        joystickl.setOnMoveListener(new JoystickView.OnMoveListener() {
-            @RequiresApi(api = Build.VERSION_CODES.O)
-            @Override
-            public void onMove(int angle, int strength) {
-                // float deadBand = 0.15f;
-                // float rx =Math.abs((joystickr.getNormalizedX()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickr.getNormalizedX()-50.0f)/50.0f);
-                // float ry =Math.abs((joystickr.getNormalizedY()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickr.getNormalizedY()-50.0f)/50.0f);
-                // float lx =Math.abs((joystickl.getNormalizedX()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickl.getNormalizedX()-50.0f)/50.0f);
-                // float ly =Math.abs((joystickl.getNormalizedY()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickl.getNormalizedY()-50.0f)/50.0f);
-                // Log.d("joystick","rx: "+rx+" "+"ry: "+ry+" "+"lx: "+lx+" "+"ly: "+ly);
-                //         //d=dx;
-                //         //c=dy;
-                //         //Log.d("strength joystic2", String.valueOf(strength));
-                //         //Log.d("dx joystic2", String.valueOf(dx));
-                //         //Log.d("dy joystic2", String.valueOf(dx));
-                //         //rc();
-                //         controllerState.setAxis(lx, -ly, rx, -ry);
-                setcontrolleraxis();
-                sendControllerUpdate();
-
-            }
-        }, 60);
-        joystickr.setOnMoveListener(new JoystickView.OnMoveListener() {
-            @RequiresApi(api = Build.VERSION_CODES.O)
-            @Override
-            public void onMove(int angle, int strength) {
-                // float deadBand = 0.15f;
-                // float rx =Math.abs((joystickr.getNormalizedX()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickr.getNormalizedX()-50.0f)/50.0f);
-                // float ry =Math.abs((joystickr.getNormalizedY()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickr.getNormalizedY()-50.0f)/50.0f);
-                // float lx =Math.abs((joystickl.getNormalizedX()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickl.getNormalizedX()-50.0f)/50.0f);
-                // float ly =Math.abs((joystickl.getNormalizedY()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickl.getNormalizedY()-50.0f)/50.0f);
-                // Log.d("joystick","rx: "+rx+" "+"ry: "+ry+" "+"lx: "+lx+" "+"ly: "+ly);
-                // //d=dx;
-                // //c=dy;
-                // //Log.d("strength joystic2", String.valueOf(strength));
-                // //Log.d("dx joystic2", String.valueOf(dx));
-                // //Log.d("dy joystic2", String.valueOf(dx));
-                // //rc();
-                // controllerState.setAxis(lx, -ly, rx, -ry);
-                setcontrolleraxis();
-                sendControllerUpdate();
-
-            }
-        }, 60);
+       // joystickl.setOnMoveListener(new JoystickView.OnMoveListener() {
+       //     @RequiresApi(api = Build.VERSION_CODES.O)
+       //     @Override
+       //     public void onMove(int angle, int strength) {
+       //         // float deadBand = 0.15f;
+       //         // float rx =Math.abs((joystickr.getNormalizedX()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickr.getNormalizedX()-50.0f)/50.0f);
+       //         // float ry =Math.abs((joystickr.getNormalizedY()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickr.getNormalizedY()-50.0f)/50.0f);
+       //         // float lx =Math.abs((joystickl.getNormalizedX()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickl.getNormalizedX()-50.0f)/50.0f);
+       //         // float ly =Math.abs((joystickl.getNormalizedY()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickl.getNormalizedY()-50.0f)/50.0f);
+       //         // Log.d("joystick","rx: "+rx+" "+"ry: "+ry+" "+"lx: "+lx+" "+"ly: "+ly);
+       //         //         //d=dx;
+       //         //         //c=dy;
+       //         //         //Log.d("strength joystic2", String.valueOf(strength));
+       //         //         //Log.d("dx joystic2", String.valueOf(dx));
+       //         //         //Log.d("dy joystic2", String.valueOf(dx));
+       //         //         //rc();
+       //         //         controllerState.setAxis(lx, -ly, rx, -ry);
+       //         setcontrolleraxis();
+       //         sendControllerUpdate();
+//
+       //     }
+       // }, 60);
+       // joystickr.setOnMoveListener(new JoystickView.OnMoveListener() {
+       //     @RequiresApi(api = Build.VERSION_CODES.O)
+       //     @Override
+       //     public void onMove(int angle, int strength) {
+       //         // float deadBand = 0.15f;
+       //         // float rx =Math.abs((joystickr.getNormalizedX()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickr.getNormalizedX()-50.0f)/50.0f);
+       //         // float ry =Math.abs((joystickr.getNormalizedY()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickr.getNormalizedY()-50.0f)/50.0f);
+       //         // float lx =Math.abs((joystickl.getNormalizedX()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickl.getNormalizedX()-50.0f)/50.0f);
+       //         // float ly =Math.abs((joystickl.getNormalizedY()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickl.getNormalizedY()-50.0f)/50.0f);
+       //         // Log.d("joystick","rx: "+rx+" "+"ry: "+ry+" "+"lx: "+lx+" "+"ly: "+ly);
+       //         // //d=dx;
+       //         // //c=dy;
+       //         // //Log.d("strength joystic2", String.valueOf(strength));
+       //         // //Log.d("dx joystic2", String.valueOf(dx));
+       //         // //Log.d("dy joystic2", String.valueOf(dx));
+       //         // //rc();
+       //         // controllerState.setAxis(lx, -ly, rx, -ry);
+       //         setcontrolleraxis();
+       //         sendControllerUpdate();
+//
+       //     }
+       // }, 60);
 
 
         takeoff.setOnClickListener(new View.OnClickListener() {
@@ -333,6 +333,34 @@ public class MainActivity extends AppCompatActivity {
         SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
         sendOneBytePacketWithoutReplay.execute(packet);
     }
+    void queryAttAngle()
+    {
+        byte[] packet = new byte[] {(byte) 0xcc, 0x58, 0x00, 0x7c, 0x48, 0x59, 0x10, 0x06, 0x00, (byte) 0xe9, (byte) 0xb3};
+        setPacketSequence(packet);
+        setPacketCRCs(packet);
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(packet);
+    }
+    void setAttAngle(float angle)
+    {
+        //                                          crc    typ  cmdL  cmdH  seqL  seqH  ang1  ang2 ang3  ang4  crc   crc
+        byte[] packet = new byte[] {(byte) 0xcc, 0x78, 0x00, 0x27, 0x68, 0x58, 0x10, 0x00, 0x00, 0x00, 0x00,0x00, 0x00, 0x5b, (byte) 0xc5};
+
+        //payload
+        byte[] bytes =ByteBuffer.allocate(8).putFloat(angle).array();
+        packet[9] = bytes[0];
+        packet[10] = bytes[1];
+        packet[11] = bytes[2];
+        packet[12] = bytes[3];
+
+        setPacketSequence(packet);
+        setPacketCRCs(packet);
+
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(packet);
+
+        queryAttAngle();//refresh
+    }
 
     /*TELLO_CMD_SWITCH_PICTURE_VIDEO
     49 0x31
@@ -418,6 +446,8 @@ public class MainActivity extends AppCompatActivity {
             sendOneBytePacketWithoutReplay.execute(connectPacket);
             StartRecivingStatus();
             requestIframe();
+            setAttAngle(25.0f);
+            StartHeartBeatJoystick();
 
 
 
@@ -645,7 +675,8 @@ public class MainActivity extends AppCompatActivity {
         byte[] videoFrame = new byte[100 * 1024];
         int videoOffset = 0;
 
-        @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+
+        @RequiresApi(api = Build.VERSION_CODES.O)
         @Override
         public void run() {
             Log.d("video start", "start");
@@ -666,11 +697,12 @@ public class MainActivity extends AppCompatActivity {
 
                             if (videoOffset > 0) {
                                 if (!isPaused) {
+                                    sendControllerUpdate();
                                     DecoderView imageView = findViewById(R.id.decoderView);
                                     byte[] videoFramenew = new byte[videoOffset];
                                     System.arraycopy(videoFrame, 0, videoFramenew, 0, videoOffset);
                                     imageView.decode(videoFramenew);
-                                    b= imageView.getBitmap();
+                                   // b= imageView.getBitmap();
                                    // b.compress(Bitmap.CompressFormat.PNG,0, new FileOutputStream(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toString()+System.nanoTime()+"/tello.png") );
                                     videoOffset = 0;
                                     // videoFrame = new byte[1460 * 100];
@@ -707,6 +739,7 @@ public class MainActivity extends AppCompatActivity {
 
         boolean bKeepRunning = true;
 
+        @RequiresApi(api = Build.VERSION_CODES.O)
         @Override
         public void run() {
             int tick = 0;
@@ -737,6 +770,44 @@ public class MainActivity extends AppCompatActivity {
     void StartHeartBeatStreamOn() {
         HeartBeatStreamon heartBeatStreamon = new HeartBeatStreamon();
         heartBeatStreamon.start();
+
+
+    }
+
+
+
+    class HeartBeatJoystick extends Thread {
+
+        boolean bKeepRunning = true;
+
+        @RequiresApi(api = Build.VERSION_CODES.O)
+        @Override
+        public void run() {
+
+            while (bKeepRunning) {
+                if(!isPaused){
+                setcontrolleraxis();}
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+
+            }
+
+
+        }
+
+        public void kill() {
+            bKeepRunning = false;
+        }
+
+    }
+
+    void StartHeartBeatJoystick() {
+        HeartBeatJoystick heartBeatJoystick = new HeartBeatJoystick();
+        heartBeatJoystick.start();
 
 
     }
@@ -853,6 +924,7 @@ public class MainActivity extends AppCompatActivity {
         DecoderView decoderView = findViewById(R.id.decoderView);
         decoderView.stop();
         isPaused = true;
+        controllerState.setAxis(0,0,0,0);
         //    try {
         //        VideoDatagramReceiver videoDatagramReceiver = new VideoDatagramReceiver();
         //        videoDatagramReceiver.kill();}catch (Exception e){
