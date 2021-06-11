@@ -22,6 +22,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.TextView;
 
 
 import java.io.IOException;
@@ -58,6 +59,7 @@ public class MainActivity extends AppCompatActivity {
     Boolean connected = false;
     Button takeoff;
     Button connect;
+    TextView textViewBattery;
     int height;
     int northSpeed;
     int eastSpeed;
@@ -125,7 +127,7 @@ public class MainActivity extends AppCompatActivity {
         joystickl = (JoystickView) findViewById(R.id.joystickView1);
         takeoff = findViewById(R.id.TakeOff);
         connect = findViewById(R.id.connect);
-        //textureView=findViewById(R.id.textureView);
+        textViewBattery= findViewById(R.id.textViewbattery);
         controllerState = new ControllerState();
         BroadcastReceiver broadcastReceiver = new WifiBroadcastReceiver();
         IntentFilter intentFilter = new IntentFilter();
@@ -928,12 +930,14 @@ public class MainActivity extends AppCompatActivity {
 
 
     void startStatus() {
-        if (!statusDatagramReceiver.isAlive()) {
-            try {
-                statusDatagramReceiver.start();//start listening for tello
-            }catch (RuntimeException e){
+        try {
+            if (!statusDatagramReceiver.isAlive()) {
+                statusDatagramReceiver.join();
+                statusDatagramReceiver=new StatusDatagramReceiver();}
+            statusDatagramReceiver.start();//start listening for tello
 
-            }
+        }catch (RuntimeException | InterruptedException e){
+            e.printStackTrace();
         }
 
 
@@ -1028,6 +1032,7 @@ public class MainActivity extends AppCompatActivity {
         imuCalibrationState      = data[index]; index += 1;
         batteryPercentage        = data[index]; index += 1;
         Log.d("batteryPercentage", String.valueOf(batteryPercentage));
+        textViewBattery.setText("Battery:"+String.valueOf(batteryPercentage));
         droneFlyTimeLeft         = data[index] | (data[index + 1] << 8); index += 2;
         droneBatteryLeft         = data[index] | (data[index + 1] << 8); index +=2;
         //index 17
