@@ -1,65 +1,42 @@
 package com.gal.tello;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.app.Activity;
-import android.app.Application;
-import android.app.usage.ExternalStorageStats;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.net.wifi.SupplicantState;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
-import android.os.Handler;
 import android.os.StrictMode;
 import android.text.format.Formatter;
-import android.util.AttributeSet;
 import android.util.Log;
-import android.util.Xml;
-import android.view.TextureView;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.ImageView;
 
 
-import com.google.common.primitives.Floats;
-import com.google.common.primitives.Ints;
-
-import java.io.Console;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.net.ConnectException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.SocketException;
-import java.net.URLEncoder;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import io.github.controlwear.virtual.joystick.android.JoystickView;
@@ -75,14 +52,46 @@ import java.lang.*;
 
 public class MainActivity extends AppCompatActivity {
     VideoDatagramReceiver videoDatagramReceiver;
-    public static final int TELLO_CAM_LISTEN_PORT = 11111;
-    Boolean VideoStarted = false;
-    Button streamon;
+    StatusDatagramReceiver statusDatagramReceiver;
     connectionlistener connectionlistener;
     boolean isstreamon = false;
     Boolean connected = false;
     Button takeoff;
-    Button land;
+    Button connect;
+    int height;
+    int northSpeed;
+    int eastSpeed;
+    int flySpeed;
+    int verticalSpeed;
+    int flyTime;
+    boolean imuState;
+    boolean pressureState;
+    boolean downVisualState;
+    boolean powerState;
+    boolean batteryState;
+    boolean gravityState;
+    boolean windState;
+    int imuCalibrationState;
+    int batteryPercentage;
+    int droneFlyTimeLeft;
+    int droneBatteryLeft;
+    boolean flying;
+    boolean onGround;
+    boolean eMOpen;
+    boolean droneHover;
+    boolean outageRecording;
+    boolean batteryLow;
+    boolean batteryLower;
+    boolean factoryMode;
+    int flyMode;
+    int throwFlyTimer;
+    int cameraState;
+    int electricalMachineryState;
+    boolean frontIn;
+    boolean frontOut;
+    boolean frontLSC;
+    int temperatureHeight;
+    int wifiStrength;
     public boolean isPaused = false;
     private static int sequence = 1;
     private MediaCodec m_codec;// Media decoder
@@ -115,8 +124,7 @@ public class MainActivity extends AppCompatActivity {
         joystickr = (JoystickView) findViewById(R.id.joystickView);
         joystickl = (JoystickView) findViewById(R.id.joystickView1);
         takeoff = findViewById(R.id.TakeOff);
-        land = findViewById(R.id.Land);
-        streamon = findViewById(R.id.StremOn);
+        connect = findViewById(R.id.connect);
         //textureView=findViewById(R.id.textureView);
         controllerState = new ControllerState();
         BroadcastReceiver broadcastReceiver = new WifiBroadcastReceiver();
@@ -128,6 +136,9 @@ public class MainActivity extends AppCompatActivity {
         connectionlistener = new connectionlistener();
         heartBeatStreamon = new HeartBeatStreamon();
         heartBeatJoystick = new HeartBeatJoystick();
+        statusDatagramReceiver = new StatusDatagramReceiver();
+        videoDatagramReceiver = new VideoDatagramReceiver();
+
 
         takeoff.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -135,20 +146,13 @@ public class MainActivity extends AppCompatActivity {
                 takeoff();
             }
         });
-        land.setOnClickListener(new View.OnClickListener() {
+        connect.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                connect();
-            }
-        });
-        streamon.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                streamon();
+                StartDroneConnection();
             }
         });
         StartDroneConnection();
-        videoDatagramReceiver = new VideoDatagramReceiver();
     }
 
     void StartDroneConnection() {
@@ -235,20 +239,21 @@ public class MainActivity extends AppCompatActivity {
             Log.d("connecting", "connecting to tello");
             while (!connected) {
                 try {
-                WifiManager wifiManager = (WifiManager) getApplication().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-                ConnectivityManager connManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-                NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
-                if(mWifi.isConnected()){
-               String ip = Formatter.formatIpAddress(wifiManager.getConnectionInfo().getIpAddress());
-               if (ip.startsWith("192.168.10.")) {
-                    if (connect().contains("ack")) {
-                        Log.d("connected", "connected");
-                        connected = true;
-                        setAttAngle(25.0f);
-                        StartHeartBeatJoystick();
-                        streamon();
-                    }
-                }}
+                    WifiManager wifiManager = (WifiManager) getApplication().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                    ConnectivityManager connManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+                    NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+                    if(mWifi.isConnected()){
+                        String ip = Formatter.formatIpAddress(wifiManager.getConnectionInfo().getIpAddress());
+                        if (ip.startsWith("192.168.10.")) {
+                            if (connect().contains("ack")) {
+                                Log.d("connected", "connected");
+                                connected = true;
+                                setAttAngle(25.0f);
+                                StartHeartBeatJoystick();
+                                streamon();
+                                startStatus();
+                            }
+                        }}
 
 
                     Thread.sleep(2000);
@@ -922,6 +927,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
+    void startStatus() {
+        if (!statusDatagramReceiver.isAlive()) {
+            try {
+                statusDatagramReceiver.start();//start listening for tello
+            }catch (RuntimeException e){
+
+            }
+        }
+
+
+    }
+
+
     class HeartBeatJoystick extends Thread {
 
         boolean bKeepRunning = true;
@@ -975,34 +993,342 @@ public class MainActivity extends AppCompatActivity {
     //     // }
     // }
 
+    int ByteArrayToInt(byte[] bytes,int index){
+        byte[] slice = Arrays.copyOfRange(bytes, index, bytes.length);
+
+        return ByteBuffer.wrap(slice).getInt();
+    }
+    float ByteArrayToSingle(byte[] bytes,int index){
+        byte[] slice = Arrays.copyOfRange(bytes, index, bytes.length);
+
+        return ByteBuffer.wrap(slice).getFloat();
+    }
+
+    public void set(byte[] data)
+    {try {
+
+        int index = 0;
+        height          = (int)(data[index] | (data[index + 1] << 8)); index += 2;
+        northSpeed      = (int) (data[index] | (data[index + 1] << 8)); index += 2;
+        eastSpeed       = (int) (data[index] | (data[index + 1] << 8)); index += 2;
+        flySpeed        = ((int)Math.sqrt(Math.pow(northSpeed, 2.0D) + Math.pow(eastSpeed, 2.0D)));
+        verticalSpeed   = (int) (data[index] | (data[index + 1] << 8)); index += 2;// ah.a(paramArrayOfByte[6], paramArrayOfByte[7]);
+        flyTime         = data[index] | (data[index + 1] << 8); index += 2;// ah.a(paramArrayOfByte[8], paramArrayOfByte[9]);
+
+        imuState        = (data[index] >> 0 & 0x1) == 1 ? true : false;
+        pressureState   = (data[index] >> 1 & 0x1) == 1 ? true : false;
+        downVisualState = (data[index] >> 2 & 0x1) == 1 ? true : false;
+        powerState      = (data[index] >> 3 & 0x1) == 1 ? true : false;
+        batteryState    = (data[index] >> 4 & 0x1) == 1 ? true : false;
+        gravityState    = (data[index] >> 5 & 0x1) == 1 ? true : false;
+        windState       = (data[index] >> 7 & 0x1) == 1 ? true : false;
+        index += 1;
+
+        //if (paramArrayOfByte.length < 19) { }
+        imuCalibrationState      = data[index]; index += 1;
+        batteryPercentage        = data[index]; index += 1;
+        Log.d("batteryPercentage", String.valueOf(batteryPercentage));
+        droneFlyTimeLeft         = data[index] | (data[index + 1] << 8); index += 2;
+        droneBatteryLeft         = data[index] | (data[index + 1] << 8); index +=2;
+        //index 17
+        flying                   = (data[index] >> 0 & 0x1)==1?true:false;
+        onGround                 = (data[index] >> 1 & 0x1) == 1 ? true : false;
+        eMOpen                   = (data[index] >> 2 & 0x1) == 1 ? true : false;
+        droneHover               = (data[index] >> 3 & 0x1) == 1 ? true : false;
+        outageRecording          = (data[index] >> 4 & 0x1) == 1 ? true : false;
+        batteryLow               = (data[index] >> 5 & 0x1) == 1 ? true : false;
+        batteryLower             = (data[index] >> 6 & 0x1) == 1 ? true : false;
+        factoryMode              = (data[index] >> 7 & 0x1) == 1 ? true : false;
+        index +=
+        flyMode                  = data[index]; index += 1;
+        throwFlyTimer            = data[index]; index += 1;
+        cameraState              = data[index]; index += 1;
+
+        //if (paramArrayOfByte.length >= 22)
+        electricalMachineryState = data[index]; index += 1; //(paramArrayOfByte[21] & 0xFF);
+
+        //if (paramArrayOfByte.length >= 23)
+        frontIn                 = (data[index] >> 0 & 0x1) == 1 ? true : false;//22
+        frontOut                = (data[index] >> 1 & 0x1) == 1 ? true : false;
+        frontLSC                = (data[index] >> 2 & 0x1) == 1 ? true : false;
+        index += 1;
+        temperatureHeight       = (data[index] >> 0 & 0x1);//23
+
+        wifiStrength    = 0;//Wifi str comes in a cmd.
+         }catch (RuntimeException e){}
+    }
+
+    //Parse some of the interesting info from the tello log stream
+   /* public void parseLog(byte[] data)
+    {
+        int pos = 0;
+
+        //A packet can contain more than one record.
+        while (pos < data.length-2)//-2 for CRC bytes at end of packet.
+        {
+            if (data[pos] != 'U')//Check magic byte
+            {
+                //Console.WriteLine("PARSE ERROR!!!");
+                break;
+            }
+            int len = data[pos + 1];
+            if (data[pos + 2] != 0)//Should always be zero (so far)
+            {
+                //Console.WriteLine("SIZE OVERFLOW!!!");
+                break;
+            }
+            int crc = data[pos + 3];
+            int id = ByteArrayToInt(data, pos + 4);
+            byte[] xorBuf = new byte[256];
+            byte xorValue = data[pos + 6];
+            switch (id)
+            {
+                case 0x1d://29 new_mvo
+                    for (int i = 0; i < len; i++)//Decrypt payload.
+                        xorBuf[i] = (byte)(data[pos + i] ^ xorValue);
+                    int index = 10;//start of the velocity and pos data.
+                    int observationCount = ByteArrayToInt(xorBuf, index); index += 2;
+                    int velX           = ByteArrayToInt(xorBuf, index); index += 2;
+                    int velY           = ByteArrayToInt(xorBuf, index); index += 2;
+                    int velZ           = ByteArrayToInt(xorBuf, index); index += 2;
+                    float posX           = ByteArrayToSingle(xorBuf, index); index += 4;
+                    float posY           = ByteArrayToSingle(xorBuf, index); index += 4;
+                    float posZ           = ByteArrayToSingle(xorBuf, index); index += 4;
+                    float posUncertainty = ByteArrayToSingle(xorBuf, index)*10000.0f; index += 4;
+                    //Console.WriteLine(observationCount + " " + posX + " " + posY + " " + posZ);
+                    break;
+                case 0x0800://2048 imu
+                    for (int i = 0; i < len; i++)//Decrypt payload.
+                        xorBuf[i] = (byte)(data[pos + i] ^ xorValue);
+                    int index2 = 10 + 48;//44 is the start of the quat data.
+                    float quatW = ByteArrayToSingle(xorBuf, index2); index2 += 4;
+                    float quatX = ByteArrayToSingle(xorBuf, index2); index2 += 4;
+                    float quatY = ByteArrayToSingle(xorBuf, index2); index2 += 4;
+                    float quatZ = ByteArrayToSingle(xorBuf, index2); index2 += 4;
+                    //Console.WriteLine("qx:" + qX + " qy:" + qY+ "qz:" + qZ);
+
+                    //var eular = toEuler(quatX, quatY, quatZ, quatW);
+                    //Console.WriteLine(" Pitch:"+eular[0] * (180 / 3.141592) + " Roll:" + eular[1] * (180 / 3.141592) + " Yaw:" + eular[2] * (180 / 3.141592));
+
+                    index2 = 10 + 76;//Start of relative velocity
+                    float velN = ByteArrayToSingle(xorBuf, index2); index2 += 4;
+                    float velE = ByteArrayToSingle(xorBuf, index2); index2 += 4;
+                    float velD = ByteArrayToSingle(xorBuf, index2); index2 += 4;
+                    //Console.WriteLine(vN + " " + vE + " " + vD);
+
+                    break;
+
+            }
+            pos += len;
+        }
+    }*/
+
     private class StatusDatagramReceiver extends Thread {
         private boolean bKeepRunning = true;
         private String lastMessage = "";
 
         @Override
         public void run() {
-            String message;
+
             byte[] lmessage = new byte[500];
             DatagramPacket packet = new DatagramPacket(lmessage, lmessage.length);
 
             try {
 
                 while (bKeepRunning) {
-                    socketStatusServer.receive(packet);
-                    message = new String(lmessage, 0, packet.getLength());
-                    lastMessage = message;
-                    Log.d("message", message);
+                    socketMainSending.receive(packet);
+                    int cmdId = ((int)packet.getData()[5] | ((int)packet.getData()[6] << 8));
+                    Log.d("Cmd id", String.valueOf(cmdId));
+                    if(cmdId>=74 && cmdId<80)
+                    {
+                        //Console.WriteLine("XXXXXXXXCMD:" + cmdId);
+                    }
+                    if (cmdId == 86)//state command
+                    {
+                        //update
+                        set(Arrays.copyOfRange(packet.getData(), 9, packet.getLength()));
+                        connected=true;
+                    }
+                    if (cmdId == 4176)//log header
+                    {
+                        //just ack.
+                        int id = ByteArrayToInt(packet.getData(), 9);
+                        //sendAckLog((short)cmdId, id);
+                        //Console.WriteLine(id);
+                    }
+                    if (cmdId == 4177)//log data
+                    {
+                        try
+                        {
+                            //state.parseLog(received.bytes.Skip(10).ToArray());
+                        }catch (Exception pex)
+                        {
+                           // Console.WriteLine("parseLog error:" + pex.Message);
+                        }
+                    }
+                    if (cmdId == 4178)//log config
+                    {
+                        //todo. this doesnt seem to be working.
+
+                        //var id = BitConverter.ToUInt16(received.bytes, 9);
+                        //var n2 = BitConverter.ToInt32(received.bytes, 11);
+                        //sendAckLogConfig((short)cmdId, id,n2);
+
+                        //var dataStr = BitConverter.ToString(received.bytes.Skip(14).Take(10).ToArray()).Replace("-", " ")/*+"  "+pos*/;
+
+
+                        //Console.WriteLine(dataStr);
+                    }
+                    if (cmdId == 4185)//att angle response
+                    {
+                        //var array = received.bytes.Skip(10).Take(4).ToArray();
+                        //float f = BitConverter.ToSingle(array, 0);
+                        //Console.WriteLine(f);
+                    }
+                    if (cmdId == 4182)//max hei response
+                    {
+                        //var array = received.bytes.Skip(9).Take(4).Reverse().ToArray();
+                        //float f = BitConverter.ToSingle(array, 0);
+                        //Console.WriteLine(f);
+                       // if (received.bytes[10] != 10)
+                       // {
+//
+                       // }
+                    }
+                    if (cmdId == 26)//wifi str command
+                    {
+                        wifiStrength = packet.getData()[9];
+                        if(packet.getData()[10]!=0)//Disturb?
+                        {
+                        }
+                    }
+                    if (cmdId == 53)//light str command
+                    {
+                    }
+                    //if (cmdId == 98)//start jpeg.
+                    //{
+                    //    picFilePath = picPath + DateTime.Now.ToString("yyyy-dd-M--HH-mm-ss") + ".jpg";
+//
+                    //    var start = 9;
+                    //    var ftype = received.bytes[start];
+                    //    start += 1;
+                    //    picBytesExpected = BitConverter.ToUInt32(received.bytes, start);
+                    //    if(picBytesExpected>picbuffer.Length)
+                    //    {
+                    //        Console.WriteLine("WARNING:Picture Too Big! " + picBytesExpected);
+                    //        picbuffer = new byte[picBytesExpected];
+                    //    }
+                    //    picBytesRecived = 0;
+                    //    picChunkState = new bool[(picBytesExpected/1024)+1]; //calc based on size.
+                    //    picPieceState = new bool[(picChunkState.Length / 8)+1];
+                    //    picExtraPackets = 0;//for debugging.
+                    //    picDownloading = true;
+//
+                    //    sendAckFileSize();
+                    //}
+                    //if(cmdId == 99)//jpeg
+                    {
+                      //  //var dataStr = BitConverter.ToString(received.bytes.Skip(0).Take(30).ToArray()).Replace("-", " ");
+//
+                      //  var start = 9;
+                      //  var fileNum = BitConverter.ToUInt16(received.bytes,start);
+                      //  start += 2;
+                      //  var pieceNum = BitConverter.ToUInt32(received.bytes, start);
+                      //  start += 4;
+                      //  var seqNum = BitConverter.ToUInt32(received.bytes, start);
+                      //  start += 4;
+                      //  var size = BitConverter.ToUInt16(received.bytes, start);
+                      //  start += 2;
+//
+                      //  maxPieceNum = Math.Max((int)pieceNum, maxPieceNum);
+                      //  if (!picChunkState[seqNum])
+                      //  {
+                      //      Array.Copy(received.bytes, start, picbuffer, seqNum * 1024, size);
+                      //      picBytesRecived += size;
+                      //      picChunkState[seqNum] = true;
+//
+                      //      for (int p = 0; p < picChunkState.Length / 8; p++)
+                      //      {
+                      //          var done = true;
+                      //          for (int s = 0; s < 8; s++)
+                      //          {
+                      //              if (!picChunkState[(p * 8) + s])
+                      //              {
+                      //                  done = false;
+                      //                  break;
+                      //              }
+                      //          }
+                      //          if (done && !picPieceState[p])
+                      //          {
+                      //              picPieceState[p] = true;
+                      //              sendAckFilePiece(0, fileNum, (UInt32)p);
+                      //              //Console.WriteLine("\nACK PN:" + p + " " + seqNum);
+                      //          }
+                      //      }
+                      //      if (picFilePath != null && picBytesRecived >= picBytesExpected)
+                      //      {
+                      //          picDownloading = false;
+//
+                      //          sendAckFilePiece(1, 0, (UInt32)maxPieceNum);//todo. Double check this. finalize
+//
+                      //          sendAckFileDone((int)picBytesExpected);
+//
+                      //          //HACK.
+                      //          //Send file done cmdId to the update listener so it knows the picture is done.
+                      //          //hack.
+                      //          onUpdate(100);
+                      //          //hack.
+                      //          //This is a hack because it is faking a message. And not a very good fake.
+                      //          //HACK.
+//
+                      //          //Console.WriteLine("\nDONE PN:" + pieceNum + " max: " + maxPieceNum);
+//
+                      //          //Save raw data minus sequence.
+                      //          //using (var stream = new FileStream(picFilePath, FileMode.Append))
+                      //          //{
+                      //          //    stream.Write(picbuffer, 0, (int)picBytesExpected);
+                      //          //}
+                      //      }
+                      //  }
+                      //  else
+                      //  {
+                      //      picExtraPackets++;//for debugging.
+//
+                      //      //if(picBytesRecived >= picBytesExpected)
+                      //      //    Console.WriteLine("\nEXTRA PN:"+pieceNum+" max "+ maxPieceNum);
+                      //  }
+
+
+                    }
+                    if (cmdId == 100)
+                    {
+
+                    }
+
+                    //send command to listeners.
+                    try
+                    {
+                        //fire update event.
+                      //  onUpdate(cmdId);
+                    }
+                    catch (Exception ex)
+                    {
+                        //Fixed. Update errors do not cause disconnect.
+                        ex.printStackTrace();
+                        //break;
+                    }
+
+
                 }
 
-                if (socketStatusServer == null) {
-                    socketStatusServer.close();
-                }
-
-            } catch (IOException ioe) {
-                ioe.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
 
-        }
+
+                if (socketMainSending == null) {
+                    socketMainSending.close();
+                }}
 
         public void kill() {
             bKeepRunning = false;
