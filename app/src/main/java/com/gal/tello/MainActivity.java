@@ -5,18 +5,28 @@ import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.app.Activity;
+import android.app.Application;
 import android.app.usage.ExternalStorageStats;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.SurfaceTexture;
 import android.media.MediaCodec;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.net.wifi.SupplicantState;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.StrictMode;
+import android.text.format.Formatter;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Xml;
@@ -35,10 +45,12 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.net.ConnectException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.SocketException;
 import java.net.URLEncoder;
 import java.net.UnknownHostException;
@@ -62,11 +74,13 @@ import java.lang.*;
 
 
 public class MainActivity extends AppCompatActivity {
-
+    VideoDatagramReceiver videoDatagramReceiver;
     public static final int TELLO_CAM_LISTEN_PORT = 11111;
     Boolean VideoStarted = false;
     Button streamon;
-    Bitmap b;
+    connectionlistener connectionlistener;
+    boolean isstreamon = false;
+    Boolean connected = false;
     Button takeoff;
     Button land;
     public boolean isPaused = false;
@@ -79,23 +93,15 @@ public class MainActivity extends AppCompatActivity {
     int picMode;
     DatagramSocket socketStatusServer;
     DatagramSocket socketStreamOnServer;
-    private static final String SAMPLE_URL = "udp://@0.0.0.0:11111";
-    public static final int portMainVideo = 11111;
     static Activity activity;
     int speed = 1;
     static ControllerState controllerState;
     static JoystickView joystickr;
     static JoystickView joystickl;
-    int iFrameRate = 8;
+    int iFrameRate = 10;
+    HeartBeatStreamon heartBeatStreamon;
+    HeartBeatJoystick heartBeatJoystick;
 
-    void StarListeningForDevice() throws IOException {
-
-        if (inetAddressMainSending.isReachable(2000)) {
-
-
-        }
-
-    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -113,51 +119,15 @@ public class MainActivity extends AppCompatActivity {
         streamon = findViewById(R.id.StremOn);
         //textureView=findViewById(R.id.textureView);
         controllerState = new ControllerState();
-       // joystickl.setOnMoveListener(new JoystickView.OnMoveListener() {
-       //     @RequiresApi(api = Build.VERSION_CODES.O)
-       //     @Override
-       //     public void onMove(int angle, int strength) {
-       //         // float deadBand = 0.15f;
-       //         // float rx =Math.abs((joystickr.getNormalizedX()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickr.getNormalizedX()-50.0f)/50.0f);
-       //         // float ry =Math.abs((joystickr.getNormalizedY()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickr.getNormalizedY()-50.0f)/50.0f);
-       //         // float lx =Math.abs((joystickl.getNormalizedX()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickl.getNormalizedX()-50.0f)/50.0f);
-       //         // float ly =Math.abs((joystickl.getNormalizedY()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickl.getNormalizedY()-50.0f)/50.0f);
-       //         // Log.d("joystick","rx: "+rx+" "+"ry: "+ry+" "+"lx: "+lx+" "+"ly: "+ly);
-       //         //         //d=dx;
-       //         //         //c=dy;
-       //         //         //Log.d("strength joystic2", String.valueOf(strength));
-       //         //         //Log.d("dx joystic2", String.valueOf(dx));
-       //         //         //Log.d("dy joystic2", String.valueOf(dx));
-       //         //         //rc();
-       //         //         controllerState.setAxis(lx, -ly, rx, -ry);
-       //         setcontrolleraxis();
-       //         sendControllerUpdate();
-//
-       //     }
-       // }, 60);
-       // joystickr.setOnMoveListener(new JoystickView.OnMoveListener() {
-       //     @RequiresApi(api = Build.VERSION_CODES.O)
-       //     @Override
-       //     public void onMove(int angle, int strength) {
-       //         // float deadBand = 0.15f;
-       //         // float rx =Math.abs((joystickr.getNormalizedX()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickr.getNormalizedX()-50.0f)/50.0f);
-       //         // float ry =Math.abs((joystickr.getNormalizedY()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickr.getNormalizedY()-50.0f)/50.0f);
-       //         // float lx =Math.abs((joystickl.getNormalizedX()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickl.getNormalizedX()-50.0f)/50.0f);
-       //         // float ly =Math.abs((joystickl.getNormalizedY()-50.0f)/50.0f) < deadBand ? 0.0f : ((joystickl.getNormalizedY()-50.0f)/50.0f);
-       //         // Log.d("joystick","rx: "+rx+" "+"ry: "+ry+" "+"lx: "+lx+" "+"ly: "+ly);
-       //         // //d=dx;
-       //         // //c=dy;
-       //         // //Log.d("strength joystic2", String.valueOf(strength));
-       //         // //Log.d("dx joystic2", String.valueOf(dx));
-       //         // //Log.d("dy joystic2", String.valueOf(dx));
-       //         // //rc();
-       //         // controllerState.setAxis(lx, -ly, rx, -ry);
-       //         setcontrolleraxis();
-       //         sendControllerUpdate();
-//
-       //     }
-       // }, 60);
-
+        BroadcastReceiver broadcastReceiver = new WifiBroadcastReceiver();
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(WifiManager.SUPPLICANT_STATE_CHANGED_ACTION);
+        intentFilter.addAction(WifiManager.SUPPLICANT_CONNECTION_CHANGE_ACTION);
+        intentFilter.addAction(WifiManager.EXTRA_SUPPLICANT_CONNECTED);
+        registerReceiver(broadcastReceiver, intentFilter);
+        connectionlistener = new connectionlistener();
+        heartBeatStreamon = new HeartBeatStreamon();
+        heartBeatJoystick = new HeartBeatJoystick();
 
         takeoff.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -177,8 +147,130 @@ public class MainActivity extends AppCompatActivity {
                 streamon();
             }
         });
-        Initialize();
+        StartDroneConnection();
+        videoDatagramReceiver = new VideoDatagramReceiver();
     }
+
+    void StartDroneConnection() {
+        // final Handler ha = new Handler();
+        // ha.postDelayed(new Runnable() {
+//
+        //     @Override
+        //     public void run() {
+        //         //call function
+        //         if (connected == false) {
+        //             if (lastreplay != null) {
+        //                 Log.d("connected", "connected");
+        //                 connected = true;
+        //                 setAttAngle(25.0f);
+        //                 StartHeartBeatJoystick();
+        //                 streamon();
+        //             } else {
+        //                 Initialize();
+        //                 connect();
+//
+        //             }
+//
+//
+        //             ha.postDelayed(this, 1000);
+        //         }
+        //     }
+//
+        // }, 0);
+
+        try {
+            if (!connectionlistener.isAlive()) {
+                connectionlistener.join();
+            connectionlistener=new connectionlistener();}
+                connectionlistener.start();//start listening for tello
+
+        }catch (RuntimeException | InterruptedException e){
+           e.printStackTrace();
+        }
+
+
+    }
+
+    public class WifiBroadcastReceiver extends BroadcastReceiver {//reconnect after disconnection
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            Log.d("Wifi Action", action);
+
+
+
+                connected = false;
+                StartDroneConnection();
+
+        }
+
+        /**
+         * Detect you are connected to a specific network.
+         */
+        private boolean checkConnectedToDesiredWifi() {
+            boolean wificonnected = false;
+
+            String desiredMacAddress = "router mac address";
+
+            WifiManager wifiManager =
+                    (WifiManager) MainActivity.this.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+
+            WifiInfo wifi = wifiManager.getConnectionInfo();
+            if (wifi != null) {
+                // get current router Mac address
+                //String bssid = wifi.getBSSID();
+                //connected = desiredMacAddress.equals(bssid);
+                wificonnected = true;
+            }
+
+            return wificonnected;
+        }
+    }
+
+    class connectionlistener extends Thread {
+
+        @Override
+        public void run() {
+            Log.d("connecting", "connecting to tello");
+            while (!connected) {
+                try {
+                WifiManager wifiManager = (WifiManager) getApplication().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+                ConnectivityManager connManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+                NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+                if(mWifi.isConnected()){
+               String ip = Formatter.formatIpAddress(wifiManager.getConnectionInfo().getIpAddress());
+               if (ip.startsWith("192.168.10.")) {
+                    if (connect().contains("ack")) {
+                        Log.d("connected", "connected");
+                        connected = true;
+                        setAttAngle(25.0f);
+                        StartHeartBeatJoystick();
+                        streamon();
+                    }
+                }}
+
+
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    //public class SendOneCommandwithoutreplay extends AsyncTask {
+//
+//
+    //    @Override
+    //    protected Object doInBackground(Object[] objects) {
+    //        if(connected==false){
+    //            DatagramPacket packet = new DatagramPacket(buf, buf.length, inetAddressMainSending, portMainSending);
+    //        }
+    //        return null;
+    //    }
+    //}
+
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     static void setcontrolleraxis() {
@@ -190,7 +282,7 @@ public class MainActivity extends AppCompatActivity {
         float ry = Float.parseFloat(df.format(Math.abs(r[1]) < deadBand ? 0.0f : r[1]));//(((float)joystickr.getNormalizedY()-50.0f)/50);
         float lx = Float.parseFloat(df.format(Math.abs(l[0]) < deadBand ? 0.0f : l[0]));//(((float)joystickl.getNormalizedX()-50.0f)/50);
         float ly = Float.parseFloat(df.format(Math.abs(l[1]) < deadBand ? 0.0f : l[1]));//(((float)joystickl.getNormalizedY()-50.0f)/50);
-        Log.d("joystick", "rx: " + rx + " " + "ry: " + ry + " " + "lx: " + lx + " " + "ly: " + ly);
+        // Log.d("joystick", "rx: " + rx + " " + "ry: " + ry + " " + "lx: " + lx + " " + "ly: " + ly);
         //d=dx;
         //c=dy;
         //Log.d("strength joystic2", String.valueOf(strength));
@@ -241,6 +333,24 @@ public class MainActivity extends AppCompatActivity {
             Log.e("IOException", e.toString());
         }
 
+
+    }
+
+    public static boolean isPortOpen(final String ip, final int port, final int timeout) {
+
+        try {
+
+            Socket socket = new Socket();
+            socket.connect(new InetSocketAddress(8890), timeout);
+            socket.close();
+            return true;
+        } catch (ConnectException ce) {
+            ce.printStackTrace();
+            return false;
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return false;
+        }
     }
 
 
@@ -333,21 +443,21 @@ public class MainActivity extends AppCompatActivity {
         SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
         sendOneBytePacketWithoutReplay.execute(packet);
     }
-    void queryAttAngle()
-    {
-        byte[] packet = new byte[] {(byte) 0xcc, 0x58, 0x00, 0x7c, 0x48, 0x59, 0x10, 0x06, 0x00, (byte) 0xe9, (byte) 0xb3};
+
+    void queryAttAngle() {
+        byte[] packet = new byte[]{(byte) 0xcc, 0x58, 0x00, 0x7c, 0x48, 0x59, 0x10, 0x06, 0x00, (byte) 0xe9, (byte) 0xb3};
         setPacketSequence(packet);
         setPacketCRCs(packet);
         SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
         sendOneBytePacketWithoutReplay.execute(packet);
     }
-    void setAttAngle(float angle)
-    {
+
+    void setAttAngle(float angle) {
         //                                          crc    typ  cmdL  cmdH  seqL  seqH  ang1  ang2 ang3  ang4  crc   crc
-        byte[] packet = new byte[] {(byte) 0xcc, 0x78, 0x00, 0x27, 0x68, 0x58, 0x10, 0x00, 0x00, 0x00, 0x00,0x00, 0x00, 0x5b, (byte) 0xc5};
+        byte[] packet = new byte[]{(byte) 0xcc, 0x78, 0x00, 0x27, 0x68, 0x58, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5b, (byte) 0xc5};
 
         //payload
-        byte[] bytes =ByteBuffer.allocate(8).putFloat(angle).array();
+        byte[] bytes = ByteBuffer.allocate(8).putFloat(angle).array();
         packet[9] = bytes[0];
         packet[10] = bytes[1];
         packet[11] = bytes[2];
@@ -410,7 +520,7 @@ public class MainActivity extends AppCompatActivity {
 
 
         @Override
-        protected String doInBackground(byte[]... bytes) {
+        public String doInBackground(byte[]... bytes) {
             byte[] buf = bytes[0];
             DatagramPacket packet = new DatagramPacket(buf, buf.length, inetAddressMainSending, portMainSending);
             try {
@@ -431,29 +541,66 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public class SendOneBytePacket extends AsyncTask<byte[], String, String> {
 
-    public void connect() {
+
+        @Override
+        protected String doInBackground(byte[]... bytes) {
+            byte[] buf = bytes[0];
+            DatagramPacket packet = new DatagramPacket(buf, buf.length, inetAddressMainSending, portMainSending);
+            String doneText = "";
+            try {
+                socketMainSending.send(packet);
+                buf = new byte[500];
+                packet = new DatagramPacket(buf, buf.length);
+                socketMainSending.setSoTimeout(500);
+                socketMainSending.receive(packet);
+                if (packet.getLength() != 0) {
+                    doneText = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
+                    Log.d("message", doneText);
+                }
 
 
+            } catch (IOException e) {
+                Log.e("IOException", e.getMessage());
+
+            } catch (Exception e) {
+                Log.e("Exception", e.getMessage());
+            }
+            return doneText;
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+        }
+    }
+
+    public String connect() {
+
+        String replay = "";
         try {
+            Initialize();
+            //InetSocketAddress addressStatus = new InetSocketAddress(8890);
+            //socketMainSending.connect(addressStatus);
+            // if(!socketMainSending.isConnected()){
+            // socketMainSending.connect(inetAddressMainSending,3000);}
+
             String connectstring = "conn_req:lh";
 
             byte[] connectPacket = connectstring.getBytes(StandardCharsets.UTF_8);
             connectPacket[9] = (byte) (6038 & 0x96);
             connectPacket[10] = 6038 >> 8;
             Log.d("connect packet", new String(connectPacket, StandardCharsets.UTF_8));
-            SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
-            sendOneBytePacketWithoutReplay.execute(connectPacket);
-            StartRecivingStatus();
-            requestIframe();
-            setAttAngle(25.0f);
-            StartHeartBeatJoystick();
-
+            SendOneBytePacket sendOneBytePacket = new SendOneBytePacket();
+            replay = sendOneBytePacket.execute(connectPacket).get();
+            Log.d("connect replay", replay);
 
 
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return replay;
     }
 
     public void takeoff() {
@@ -589,26 +736,22 @@ public class MainActivity extends AppCompatActivity {
         return packet;
     }
 
-    void StartRecivingStatus() throws SocketException {
-        socketStatusServer = new DatagramSocket(null);
-        InetSocketAddress addressStatus = new InetSocketAddress(8890);
-        socketStatusServer.bind(addressStatus);
-        try {
-            StatusDatagramReceiver statusDatagramReceiver = new StatusDatagramReceiver();
-            statusDatagramReceiver.start();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-    }
 
     void StartRecivingVideoStream() {
         try {
-            socketStreamOnServer = new DatagramSocket(null);
-            InetSocketAddress addressVideo = new InetSocketAddress(6038);
-            socketStreamOnServer.bind(addressVideo);
-            VideoDatagramReceiver videoDatagramReceiver = new VideoDatagramReceiver();
-            videoDatagramReceiver.start();
+            if (isstreamon == false) {
+                socketStreamOnServer = new DatagramSocket(null);
+                InetSocketAddress addressVideo = new InetSocketAddress(6038);
+                socketStreamOnServer.bind(addressVideo);
+                if (!videoDatagramReceiver.isAlive()) {
+                    try {
+                        videoDatagramReceiver.start();//start listening for tello
+                    }catch (RuntimeException e){
+
+                    }
+                }
+                isstreamon = true;
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -670,7 +813,6 @@ public class MainActivity extends AppCompatActivity {
 
     private class VideoDatagramReceiver extends Thread {
         private boolean bKeepRunning = true;
-        private String lastMessage = "";
         public byte[] lmessage = new byte[1460];
         byte[] videoFrame = new byte[100 * 1024];
         int videoOffset = 0;
@@ -702,8 +844,8 @@ public class MainActivity extends AppCompatActivity {
                                     byte[] videoFramenew = new byte[videoOffset];
                                     System.arraycopy(videoFrame, 0, videoFramenew, 0, videoOffset);
                                     imageView.decode(videoFramenew);
-                                   // b= imageView.getBitmap();
-                                   // b.compress(Bitmap.CompressFormat.PNG,0, new FileOutputStream(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toString()+System.nanoTime()+"/tello.png") );
+                                    // b= imageView.getBitmap();
+                                    // b.compress(Bitmap.CompressFormat.PNG,0, new FileOutputStream(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toString()+System.nanoTime()+"/tello.png") );
                                     videoOffset = 0;
                                     // videoFrame = new byte[1460 * 100];
                                 }
@@ -768,12 +910,16 @@ public class MainActivity extends AppCompatActivity {
     }
 
     void StartHeartBeatStreamOn() {
-        HeartBeatStreamon heartBeatStreamon = new HeartBeatStreamon();
-        heartBeatStreamon.start();
+        if (!heartBeatStreamon.isAlive()) {
+            try {
+                heartBeatStreamon.start();//start listening for tello
+            }catch (RuntimeException e){
+
+            }
+        }
 
 
     }
-
 
 
     class HeartBeatJoystick extends Thread {
@@ -785,10 +931,11 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
 
             while (bKeepRunning) {
-                if(!isPaused){
-                setcontrolleraxis();}
+                if (!isPaused) {
+                    setcontrolleraxis();
+                }
                 try {
-                    Thread.sleep(100);
+                    Thread.sleep(50);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -806,22 +953,27 @@ public class MainActivity extends AppCompatActivity {
     }
 
     void StartHeartBeatJoystick() {
-        HeartBeatJoystick heartBeatJoystick = new HeartBeatJoystick();
-        heartBeatJoystick.start();
+        if (!heartBeatJoystick.isAlive()) {
+            try {
+                heartBeatJoystick.start();//start listening for tello
+            }catch (RuntimeException e){
+
+            }
+        }
 
 
     }
 
 
-  // public void rc() {
+    // public void rc() {
 
-  //    /* if(a==70&&b==-70&&c==-70&&d==-70){
-  //     Log.d("startmotors","motorstart");}
-  //     else{*/
-  //     SendOneCommandwithoutreplay sendOneCommand = new SendOneCommandwithoutreplay();
-  //     sendOneCommand.doInBackground("rc " + a + " " + b + " " + c + " " + d);
-  //     // }
-  // }
+    //    /* if(a==70&&b==-70&&c==-70&&d==-70){
+    //     Log.d("startmotors","motorstart");}
+    //     else{*/
+    //     SendOneCommandwithoutreplay sendOneCommand = new SendOneCommandwithoutreplay();
+    //     sendOneCommand.doInBackground("rc " + a + " " + b + " " + c + " " + d);
+    //     // }
+    // }
 
     private class StatusDatagramReceiver extends Thread {
         private boolean bKeepRunning = true;
@@ -924,7 +1076,7 @@ public class MainActivity extends AppCompatActivity {
         DecoderView decoderView = findViewById(R.id.decoderView);
         decoderView.stop();
         isPaused = true;
-        controllerState.setAxis(0,0,0,0);
+        controllerState.setAxis(0, 0, 0, 0);
         //    try {
         //        VideoDatagramReceiver videoDatagramReceiver = new VideoDatagramReceiver();
         //        videoDatagramReceiver.kill();}catch (Exception e){
