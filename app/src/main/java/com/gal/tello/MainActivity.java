@@ -156,6 +156,22 @@ public class MainActivity extends AppCompatActivity {
         });
         StartDroneConnection();
     }
+    private void hideSystemUI() {
+        // Enables regular immersive mode.
+        // For "lean back" mode, remove SYSTEM_UI_FLAG_IMMERSIVE.
+        // Or for "sticky immersive," replace it with SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        View decorView = getWindow().getDecorView();
+        decorView.setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_IMMERSIVE
+                        // Set the content to appear under the system bars so that the
+                        // content doesn't resize when the system bars hide and show.
+                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        // Hide the nav bar and status bar
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_FULLSCREEN);
+    }
 
     void StartDroneConnection() {
         // final Handler ha = new Handler();
@@ -252,8 +268,10 @@ public class MainActivity extends AppCompatActivity {
                                 connected = true;
                                 setAttAngle(25.0f);
                                 StartHeartBeatJoystick();
+                                activity = (Activity) MainActivity.this;
                                 streamon();
                                 startStatus();
+                                setPicVidMode(1);
                             }
                         }}
 
@@ -1152,7 +1170,7 @@ public class MainActivity extends AppCompatActivity {
                     {
                         //update
                         set(Arrays.copyOfRange(packet.getData(), 9, packet.getLength()));
-                        connected=true;
+
                     }
                     if (cmdId == 4176)//log header
                     {
@@ -1418,6 +1436,8 @@ public class MainActivity extends AppCompatActivity {
     public void onResume() {
         super.onResume();
         isPaused = false;
+        getSupportActionBar().hide();
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         // StartRecivingVideoStream();
 
 
