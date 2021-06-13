@@ -16,6 +16,7 @@ import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.StrictMode;
 import android.text.format.Formatter;
 import android.util.Log;
@@ -23,8 +24,11 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.DatagramPacket;
@@ -34,9 +38,11 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 
@@ -52,6 +58,10 @@ import java.lang.*;
 
 
 public class MainActivity extends AppCompatActivity {
+    byte[] picbuffer = new byte[3000 * 1024];
+    String picFilePath;
+    boolean[] picPieceState;
+
     VideoDatagramReceiver videoDatagramReceiver;
     StatusDatagramReceiver statusDatagramReceiver;
     connectionlistener connectionlistener;
@@ -59,13 +69,20 @@ public class MainActivity extends AppCompatActivity {
     Boolean connected = false;
     Button takeoff;
     Button connect;
+    Button takepicture;
+    boolean[] picChunkState;
     TextView textViewBattery;
+    int picBytesRecived;
     int height;
     int northSpeed;
     int eastSpeed;
     int flySpeed;
     int verticalSpeed;
     int flyTime;
+    int picBytesExpected;
+    int maxPieceNum = 0;
+    int picExtraPackets;
+    boolean picDownloading = false;
     boolean imuState;
     boolean pressureState;
     boolean downVisualState;
@@ -112,6 +129,7 @@ public class MainActivity extends AppCompatActivity {
     int iFrameRate = 10;
     HeartBeatStreamon heartBeatStreamon;
     HeartBeatJoystick heartBeatJoystick;
+    BitConverter bitConverter;
 
 
     @Override
@@ -120,14 +138,15 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         getSupportActionBar().hide();
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        activity = (Activity) MainActivity.this;
+        activity = (Activity) this;
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
         StrictMode.setThreadPolicy(policy);
         joystickr = (JoystickView) findViewById(R.id.joystickView);
         joystickl = (JoystickView) findViewById(R.id.joystickView1);
         takeoff = findViewById(R.id.TakeOff);
         connect = findViewById(R.id.connect);
-        textViewBattery= findViewById(R.id.textViewbattery);
+        takepicture=findViewById(R.id.takepicture);
+        textViewBattery = findViewById(R.id.textViewbattery);
         controllerState = new ControllerState();
         BroadcastReceiver broadcastReceiver = new WifiBroadcastReceiver();
         IntentFilter intentFilter = new IntentFilter();
@@ -140,7 +159,7 @@ public class MainActivity extends AppCompatActivity {
         heartBeatJoystick = new HeartBeatJoystick();
         statusDatagramReceiver = new StatusDatagramReceiver();
         videoDatagramReceiver = new VideoDatagramReceiver();
-
+        bitConverter = new BitConverter();
 
         takeoff.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -155,7 +174,22 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         StartDroneConnection();
+        takepicture.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(!picDownloading){
+                takePicture();}
+            }
+        });
+        joystickr.setOnMoveListener(new JoystickView.OnMoveListener() {
+            @Override
+            public void onMove(int angle, int strength) {
+
+            }
+        });
     }
+
+
     private void hideSystemUI() {
         // Enables regular immersive mode.
         // For "lean back" mode, remove SYSTEM_UI_FLAG_IMMERSIVE.
@@ -203,11 +237,12 @@ public class MainActivity extends AppCompatActivity {
         try {
             if (!connectionlistener.isAlive()) {
                 connectionlistener.join();
-            connectionlistener=new connectionlistener();}
-                connectionlistener.start();//start listening for tello
+                connectionlistener = new connectionlistener();
+            }
+            connectionlistener.start();//start listening for tello
 
-        }catch (RuntimeException | InterruptedException e){
-           e.printStackTrace();
+        } catch (RuntimeException | InterruptedException e) {
+            e.printStackTrace();
         }
 
 
@@ -221,9 +256,8 @@ public class MainActivity extends AppCompatActivity {
             Log.d("Wifi Action", action);
 
 
-
-                connected = false;
-                StartDroneConnection();
+            connected = false;
+            StartDroneConnection();
 
         }
 
@@ -260,23 +294,24 @@ public class MainActivity extends AppCompatActivity {
                     WifiManager wifiManager = (WifiManager) getApplication().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
                     ConnectivityManager connManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
                     NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
-                    if(mWifi.isConnected()){
+                    if (mWifi.isConnected()) {
                         String ip = Formatter.formatIpAddress(wifiManager.getConnectionInfo().getIpAddress());
                         if (ip.startsWith("192.168.10.")) {
-                            if (connect().contains("ack")) {
+                            if (connect()!="") {
                                 Log.d("connected", "connected");
                                 connected = true;
                                 setAttAngle(25.0f);
                                 StartHeartBeatJoystick();
                                 activity = (Activity) MainActivity.this;
+                                setPicVidMode(0);
                                 streamon();
                                 startStatus();
-                                setPicVidMode(1);
                             }
-                        }}
+                        }
+                    }
 
 
-                    Thread.sleep(2000);
+                    Thread.sleep(500);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -301,19 +336,14 @@ public class MainActivity extends AppCompatActivity {
     static void setcontrolleraxis() {
         float deadBand = 0.15f;
         DecimalFormat df = new DecimalFormat("#.#");
+
         float[] r = ellipticalDiscToSquare((((float) joystickr.getNormalizedX() - 50.0f) / 50), (((float) joystickr.getNormalizedY() - 50.0f) / 50));
         float[] l = ellipticalDiscToSquare((((float) joystickl.getNormalizedX() - 50.0f) / 50), (((float) joystickl.getNormalizedY() - 50.0f) / 50));
         float rx = Float.parseFloat(df.format(Math.abs(r[0]) < deadBand ? 0.0f : r[0]));//(((float)joystickr.getNormalizedX()-50.0f)/50);
         float ry = Float.parseFloat(df.format(Math.abs(r[1]) < deadBand ? 0.0f : r[1]));//(((float)joystickr.getNormalizedY()-50.0f)/50);
         float lx = Float.parseFloat(df.format(Math.abs(l[0]) < deadBand ? 0.0f : l[0]));//(((float)joystickl.getNormalizedX()-50.0f)/50);
         float ly = Float.parseFloat(df.format(Math.abs(l[1]) < deadBand ? 0.0f : l[1]));//(((float)joystickl.getNormalizedY()-50.0f)/50);
-        // Log.d("joystick", "rx: " + rx + " " + "ry: " + ry + " " + "lx: " + lx + " " + "ly: " + ly);
-        //d=dx;
-        //c=dy;
-        //Log.d("strength joystic2", String.valueOf(strength));
-        //Log.d("dx joystic2", String.valueOf(dx));
-        //Log.d("dy joystic2", String.valueOf(dx));
-        //rc();
+         Log.d("joystick", "rx: " + rx + " " + "ry: " + ry + " " + "lx: " + lx + " " + "ly: " + ly+" " + "ly: " + ly);
         controllerState.setSpeedMode(1);
         controllerState.setAxis(lx, -ly, rx, -ry);
         sendControllerUpdate();
@@ -482,7 +512,7 @@ public class MainActivity extends AppCompatActivity {
         byte[] packet = new byte[]{(byte) 0xcc, 0x78, 0x00, 0x27, 0x68, 0x58, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5b, (byte) 0xc5};
 
         //payload
-        byte[] bytes = ByteBuffer.allocate(8).putFloat(angle).array();
+        byte[] bytes = ByteBuffer.allocate(4).putFloat(angle).array();
         packet[9] = bytes[0];
         packet[10] = bytes[1];
         packet[11] = bytes[2];
@@ -517,6 +547,9 @@ public class MainActivity extends AppCompatActivity {
 
         SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
         sendOneBytePacketWithoutReplay.execute(packet);
+
+        DecoderView imageView = findViewById(R.id.decoderView);
+        imageView.Init();
     }
 
     void setEV(int ev) {
@@ -646,6 +679,17 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
         }
     }
+    void takePicture()
+    {
+        //                                          crc    typ  cmdL  cmdH  seqL  seqH  crc   crc
+
+        byte[] packet = new byte[] {(byte) 0xcc, 0x58, 0x00, 0x7c, 0x68, 0x30, 0x00, 0x06, 0x00, (byte) 0xe9, (byte) 0xb3};
+        setPacketSequence(packet);
+        setPacketCRCs(packet);
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(packet);
+        Log.d("takepicture","takepicture");
+    }
 
     private static void setPacketSequence(byte[] packet) {
         packet[7] = (byte) (sequence & 0xff);
@@ -764,16 +808,15 @@ public class MainActivity extends AppCompatActivity {
 
     void StartRecivingVideoStream() {
         try {
-            if (isstreamon == false) {
                 socketStreamOnServer = new DatagramSocket(null);
                 InetSocketAddress addressVideo = new InetSocketAddress(6038);
                 socketStreamOnServer.bind(addressVideo);
                 if (!videoDatagramReceiver.isAlive()) {
                     try {
                         videoDatagramReceiver.start();//start listening for tello
-                    }catch (RuntimeException e){
+                    } catch (RuntimeException e) {
 
-                    }
+
                 }
                 isstreamon = true;
             }
@@ -876,8 +919,15 @@ public class MainActivity extends AppCompatActivity {
                                 }
                             }
                         }
-                        System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                        videoOffset += (data.length - 2);
+                        try {
+                            System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                            videoOffset += (data.length - 2);
+                        }catch (Exception e){
+                             videoFrame = new byte[100 * 1024];
+
+                             videoOffset = 0;
+                        }
+
 
                     } catch (RuntimeException e) {
                         e.printStackTrace();
@@ -938,7 +988,7 @@ public class MainActivity extends AppCompatActivity {
         if (!heartBeatStreamon.isAlive()) {
             try {
                 heartBeatStreamon.start();//start listening for tello
-            }catch (RuntimeException e){
+            } catch (RuntimeException e) {
 
             }
         }
@@ -951,10 +1001,11 @@ public class MainActivity extends AppCompatActivity {
         try {
             if (!statusDatagramReceiver.isAlive()) {
                 statusDatagramReceiver.join();
-                statusDatagramReceiver=new StatusDatagramReceiver();}
+                statusDatagramReceiver = new StatusDatagramReceiver();
+            }
             statusDatagramReceiver.start();//start listening for tello
 
-        }catch (RuntimeException | InterruptedException e){
+        } catch (RuntimeException | InterruptedException e) {
             e.printStackTrace();
         }
 
@@ -972,6 +1023,7 @@ public class MainActivity extends AppCompatActivity {
 
             while (bKeepRunning) {
                 if (!isPaused) {
+
                     setcontrolleraxis();
                 }
                 try {
@@ -996,7 +1048,7 @@ public class MainActivity extends AppCompatActivity {
         if (!heartBeatJoystick.isAlive()) {
             try {
                 heartBeatJoystick.start();//start listening for tello
-            }catch (RuntimeException e){
+            } catch (RuntimeException e) {
 
             }
         }
@@ -1015,70 +1067,86 @@ public class MainActivity extends AppCompatActivity {
     //     // }
     // }
 
-    int ByteArrayToInt(byte[] bytes,int index){
-        byte[] slice = Arrays.copyOfRange(bytes, index, bytes.length);
 
-        return ByteBuffer.wrap(slice).getInt();
+    byte[] ShortToByteaArray(Short _short) {
+        ByteBuffer buffer = ByteBuffer.allocate(2);
+        buffer.putShort(_short);
+        return buffer.array();
     }
-    float ByteArrayToSingle(byte[] bytes,int index){
+
+    float ByteArrayToSingle(byte[] bytes, int index) {
         byte[] slice = Arrays.copyOfRange(bytes, index, bytes.length);
 
         return ByteBuffer.wrap(slice).getFloat();
     }
 
-    public void set(byte[] data)
-    {try {
+    public void set(byte[] data) {
+        try {
 
-        int index = 0;
-        height          = (int)(data[index] | (data[index + 1] << 8)); index += 2;
-        northSpeed      = (int) (data[index] | (data[index + 1] << 8)); index += 2;
-        eastSpeed       = (int) (data[index] | (data[index + 1] << 8)); index += 2;
-        flySpeed        = ((int)Math.sqrt(Math.pow(northSpeed, 2.0D) + Math.pow(eastSpeed, 2.0D)));
-        verticalSpeed   = (int) (data[index] | (data[index + 1] << 8)); index += 2;// ah.a(paramArrayOfByte[6], paramArrayOfByte[7]);
-        flyTime         = data[index] | (data[index + 1] << 8); index += 2;// ah.a(paramArrayOfByte[8], paramArrayOfByte[9]);
+            int index = 0;
+            height = (int) (data[index] | (data[index + 1] << 8));
+            index += 2;
+            northSpeed = (int) (data[index] | (data[index + 1] << 8));
+            index += 2;
+            eastSpeed = (int) (data[index] | (data[index + 1] << 8));
+            index += 2;
+            flySpeed = ((int) Math.sqrt(Math.pow(northSpeed, 2.0D) + Math.pow(eastSpeed, 2.0D)));
+            verticalSpeed = (int) (data[index] | (data[index + 1] << 8));
+            index += 2;// ah.a(paramArrayOfByte[6], paramArrayOfByte[7]);
+            flyTime = data[index] | (data[index + 1] << 8);
+            index += 2;// ah.a(paramArrayOfByte[8], paramArrayOfByte[9]);
 
-        imuState        = (data[index] >> 0 & 0x1) == 1 ? true : false;
-        pressureState   = (data[index] >> 1 & 0x1) == 1 ? true : false;
-        downVisualState = (data[index] >> 2 & 0x1) == 1 ? true : false;
-        powerState      = (data[index] >> 3 & 0x1) == 1 ? true : false;
-        batteryState    = (data[index] >> 4 & 0x1) == 1 ? true : false;
-        gravityState    = (data[index] >> 5 & 0x1) == 1 ? true : false;
-        windState       = (data[index] >> 7 & 0x1) == 1 ? true : false;
-        index += 1;
+            imuState = (data[index] >> 0 & 0x1) == 1 ? true : false;
+            pressureState = (data[index] >> 1 & 0x1) == 1 ? true : false;
+            downVisualState = (data[index] >> 2 & 0x1) == 1 ? true : false;
+            powerState = (data[index] >> 3 & 0x1) == 1 ? true : false;
+            batteryState = (data[index] >> 4 & 0x1) == 1 ? true : false;
+            gravityState = (data[index] >> 5 & 0x1) == 1 ? true : false;
+            windState = (data[index] >> 7 & 0x1) == 1 ? true : false;
+            index += 1;
 
-        //if (paramArrayOfByte.length < 19) { }
-        imuCalibrationState      = data[index]; index += 1;
-        batteryPercentage        = data[index]; index += 1;
-        Log.d("batteryPercentage", String.valueOf(batteryPercentage));
-        textViewBattery.setText("Battery:"+String.valueOf(batteryPercentage));
-        droneFlyTimeLeft         = data[index] | (data[index + 1] << 8); index += 2;
-        droneBatteryLeft         = data[index] | (data[index + 1] << 8); index +=2;
-        //index 17
-        flying                   = (data[index] >> 0 & 0x1)==1?true:false;
-        onGround                 = (data[index] >> 1 & 0x1) == 1 ? true : false;
-        eMOpen                   = (data[index] >> 2 & 0x1) == 1 ? true : false;
-        droneHover               = (data[index] >> 3 & 0x1) == 1 ? true : false;
-        outageRecording          = (data[index] >> 4 & 0x1) == 1 ? true : false;
-        batteryLow               = (data[index] >> 5 & 0x1) == 1 ? true : false;
-        batteryLower             = (data[index] >> 6 & 0x1) == 1 ? true : false;
-        factoryMode              = (data[index] >> 7 & 0x1) == 1 ? true : false;
-        index +=
-        flyMode                  = data[index]; index += 1;
-        throwFlyTimer            = data[index]; index += 1;
-        cameraState              = data[index]; index += 1;
+            //if (paramArrayOfByte.length < 19) { }
+            imuCalibrationState = data[index];
+            index += 1;
+            batteryPercentage = data[index];
+            index += 1;
+            Log.d("batteryPercentage", String.valueOf(batteryPercentage));
+            textViewBattery.setText("Battery:" + String.valueOf(batteryPercentage));
+            droneFlyTimeLeft = data[index] | (data[index + 1] << 8);
+            index += 2;
+            droneBatteryLeft = data[index] | (data[index + 1] << 8);
+            index += 2;
+            //index 17
+            flying = (data[index] >> 0 & 0x1) == 1 ? true : false;
+            onGround = (data[index] >> 1 & 0x1) == 1 ? true : false;
+            eMOpen = (data[index] >> 2 & 0x1) == 1 ? true : false;
+            droneHover = (data[index] >> 3 & 0x1) == 1 ? true : false;
+            outageRecording = (data[index] >> 4 & 0x1) == 1 ? true : false;
+            batteryLow = (data[index] >> 5 & 0x1) == 1 ? true : false;
+            batteryLower = (data[index] >> 6 & 0x1) == 1 ? true : false;
+            factoryMode = (data[index] >> 7 & 0x1) == 1 ? true : false;
+            index +=
+                    flyMode = data[index];
+            index += 1;
+            throwFlyTimer = data[index];
+            index += 1;
+            cameraState = data[index];
+            index += 1;
 
-        //if (paramArrayOfByte.length >= 22)
-        electricalMachineryState = data[index]; index += 1; //(paramArrayOfByte[21] & 0xFF);
+            //if (paramArrayOfByte.length >= 22)
+            electricalMachineryState = data[index];
+            index += 1; //(paramArrayOfByte[21] & 0xFF);
 
-        //if (paramArrayOfByte.length >= 23)
-        frontIn                 = (data[index] >> 0 & 0x1) == 1 ? true : false;//22
-        frontOut                = (data[index] >> 1 & 0x1) == 1 ? true : false;
-        frontLSC                = (data[index] >> 2 & 0x1) == 1 ? true : false;
-        index += 1;
-        temperatureHeight       = (data[index] >> 0 & 0x1);//23
+            //if (paramArrayOfByte.length >= 23)
+            frontIn = (data[index] >> 0 & 0x1) == 1 ? true : false;//22
+            frontOut = (data[index] >> 1 & 0x1) == 1 ? true : false;
+            frontLSC = (data[index] >> 2 & 0x1) == 1 ? true : false;
+            index += 1;
+            temperatureHeight = (data[index] >> 0 & 0x1);//23
 
-        wifiStrength    = 0;//Wifi str comes in a cmd.
-         }catch (RuntimeException e){}
+            wifiStrength = 0;//Wifi str comes in a cmd.
+        } catch (RuntimeException e) {
+        }
     }
 
     //Parse some of the interesting info from the tello log stream
@@ -1101,7 +1169,7 @@ public class MainActivity extends AppCompatActivity {
                 break;
             }
             int crc = data[pos + 3];
-            int id = ByteArrayToInt(data, pos + 4);
+            int id = BitConverter.toInt16(data, pos + 4);
             byte[] xorBuf = new byte[256];
             byte xorValue = data[pos + 6];
             switch (id)
@@ -1110,10 +1178,10 @@ public class MainActivity extends AppCompatActivity {
                     for (int i = 0; i < len; i++)//Decrypt payload.
                         xorBuf[i] = (byte)(data[pos + i] ^ xorValue);
                     int index = 10;//start of the velocity and pos data.
-                    int observationCount = ByteArrayToInt(xorBuf, index); index += 2;
-                    int velX           = ByteArrayToInt(xorBuf, index); index += 2;
-                    int velY           = ByteArrayToInt(xorBuf, index); index += 2;
-                    int velZ           = ByteArrayToInt(xorBuf, index); index += 2;
+                    int observationCount = BitConverter.toInt16(xorBuf, index); index += 2;
+                    int velX           = BitConverter.toInt16(xorBuf, index); index += 2;
+                    int velY           = BitConverter.toInt16(xorBuf, index); index += 2;
+                    int velZ           = BitConverter.toInt16(xorBuf, index); index += 2;
                     float posX           = ByteArrayToSingle(xorBuf, index); index += 4;
                     float posY           = ByteArrayToSingle(xorBuf, index); index += 4;
                     float posZ           = ByteArrayToSingle(xorBuf, index); index += 4;
@@ -1145,48 +1213,117 @@ public class MainActivity extends AppCompatActivity {
             pos += len;
         }
     }*/
+    public static void sendAckFilePiece(byte endFlag,int fileId, int pieceId)
+    {
+        //                                          crc    typ  cmdL  cmdH  seqL  seqH  byte  nL    nH    n2L                     crc   crc
+        byte[] packet = new byte[] {(byte) 0xcc, (byte) 0x90, 0x00, 0x27, 0x50, 0x63, 0x00, (byte) 0xf0, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5b, (byte) 0xc5};
+
+        packet[9] = endFlag;
+        packet[10] = (byte)(fileId & 0xff);
+        packet[11] = (byte)((fileId >> 8) & 0xff);
+
+        packet[12] = ((byte)(int)(0xFF & pieceId));
+        packet[13] = ((byte)(int)(pieceId >> 8 & 0xFF));
+        packet[14] = ((byte)(int)(pieceId >> 16 & 0xFF));
+        packet[15] = ((byte)(int)(pieceId >> 24 & 0xFF));
+
+        setPacketSequence(packet);
+        setPacketCRCs(packet);
+        //var dataStr = BitConverter.ToString(packet).Replace("-", " ");
+        //Console.WriteLine(dataStr);
+
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(packet);
+    }
+    void sendAckFileSize()
+    {
+        //                                          crc    typ  cmdL  cmdH  seqL  seqH  modL  crc   crc
+        byte[] packet = new byte[] {(byte) 0xcc, 0x60, 0x00, 0x27, 0x50, 0x62, 0x00, 0x00, 0x00, 0x00, 0x5b, (byte) 0xc5};
+        setPacketSequence(packet);
+        setPacketCRCs(packet);
+
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(packet);
+    }
+    public static void sendAckFileDone(int size)
+    {
+        //                                          crc    typ  cmdL  cmdH  seqL  seqH  fidL  fidH  size  size  size  size  crc   crc
+        byte[] packet = new byte[] {(byte) 0xcc, (byte) 0x88, 0x00, 0x24, 0x48, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5b, (byte) 0xc5};
+
+        //packet[9] = (byte)(fileid & 0xff);
+        //packet[10] = (byte)((fileid >> 8) & 0xff);
+
+        packet[11] = ((byte)(int)(0xFF & size));
+        packet[12] = ((byte)(int)(size >> 8 & 0xFF));
+        packet[13] = ((byte)(int)(size >> 16 & 0xFF));
+        packet[14] = ((byte)(int)(size >> 24 & 0xFF));
+        setPacketSequence(packet);
+        setPacketCRCs(packet);
+
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(packet);
+    }
+    void sendAckLog(short cmd,short id)
+    {
+        //                                          crc    typ  cmdL  cmdH  seqL  seqH  unk   idL   idH   crc   crc
+        byte[] packet = new byte[] {(byte) 0xcc, 0x70, 0x00, 0x27, 0x50, 0x50, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5b, (byte) 0xc5};
+
+        byte[] ba = ShortToByteaArray(cmd);
+        packet[5] = ba[0];
+        packet[6] = ba[1];
+
+        ba = ShortToByteaArray(id);
+        packet[10] = ba[0];
+        packet[11] = ba[1];
+
+        setPacketSequence(packet);
+        setPacketCRCs(packet);
+
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(packet);
+    }
 
     private class StatusDatagramReceiver extends Thread {
         private boolean bKeepRunning = true;
-        private String lastMessage = "";
 
+        @RequiresApi(api = Build.VERSION_CODES.O)
         @Override
         public void run() {
 
-            byte[] lmessage = new byte[500];
+            byte[] lmessage = new byte[2048];
             DatagramPacket packet = new DatagramPacket(lmessage, lmessage.length);
 
             try {
 
                 while (bKeepRunning) {
                     socketMainSending.receive(packet);
-                    int cmdId = ((int)packet.getData()[5] | ((int)packet.getData()[6] << 8));
+                    byte[] recived = new byte[packet.getLength()];
+                    System.arraycopy(packet.getData(), 0, recived, 0, packet.getLength());
+                    int cmdId = ((int) recived[5] | ((int) recived[6] << 8));
                     Log.d("Cmd id", String.valueOf(cmdId));
-                    if(cmdId>=74 && cmdId<80)
-                    {
+                    try {
+                    if (cmdId >= 74 && cmdId < 80) {
                         //Console.WriteLine("XXXXXXXXCMD:" + cmdId);
                     }
                     if (cmdId == 86)//state command
                     {
                         //update
-                        set(Arrays.copyOfRange(packet.getData(), 9, packet.getLength()));
+                        set(Arrays.copyOfRange(recived, 9, recived.length));
 
                     }
                     if (cmdId == 4176)//log header
                     {
                         //just ack.
-                        int id = ByteArrayToInt(packet.getData(), 9);
+                        //int id = BitConverter.toInt16(recived, 9);
                         //sendAckLog((short)cmdId, id);
                         //Console.WriteLine(id);
                     }
                     if (cmdId == 4177)//log data
                     {
-                        try
-                        {
+                        try {
                             //state.parseLog(received.bytes.Skip(10).ToArray());
-                        }catch (Exception pex)
-                        {
-                           // Console.WriteLine("parseLog error:" + pex.Message);
+                        } catch (Exception pex) {
+                            // Console.WriteLine("parseLog error:" + pex.Message);
                         }
                     }
                     if (cmdId == 4178)//log config
@@ -1204,154 +1341,157 @@ public class MainActivity extends AppCompatActivity {
                     }
                     if (cmdId == 4185)//att angle response
                     {
-                        //var array = received.bytes.Skip(10).Take(4).ToArray();
-                        //float f = BitConverter.ToSingle(array, 0);
-                        //Console.WriteLine(f);
+                        byte[] array = Arrays.copyOfRange(recived,10,14);
+                        float f = ByteArrayToSingle(array, 0);
+                        Log.d("att angle response", String.valueOf(f));
                     }
                     if (cmdId == 4182)//max hei response
                     {
                         //var array = received.bytes.Skip(9).Take(4).Reverse().ToArray();
                         //float f = BitConverter.ToSingle(array, 0);
                         //Console.WriteLine(f);
-                       // if (received.bytes[10] != 10)
-                       // {
+                        // if (received.bytes[10] != 10)
+                        // {
 //
-                       // }
+                        // }
                     }
                     if (cmdId == 26)//wifi str command
                     {
-                        wifiStrength = packet.getData()[9];
-                        if(packet.getData()[10]!=0)//Disturb?
+                        wifiStrength = recived[9];
+                        if (recived[10] != 0)//Disturb?
                         {
                         }
                     }
                     if (cmdId == 53)//light str command
                     {
                     }
-                    //if (cmdId == 98)//start jpeg.
-                    //{
-                    //    picFilePath = picPath + DateTime.Now.ToString("yyyy-dd-M--HH-mm-ss") + ".jpg";
-//
-                    //    var start = 9;
-                    //    var ftype = received.bytes[start];
-                    //    start += 1;
-                    //    picBytesExpected = BitConverter.ToUInt32(received.bytes, start);
-                    //    if(picBytesExpected>picbuffer.Length)
-                    //    {
-                    //        Console.WriteLine("WARNING:Picture Too Big! " + picBytesExpected);
-                    //        picbuffer = new byte[picBytesExpected];
-                    //    }
-                    //    picBytesRecived = 0;
-                    //    picChunkState = new bool[(picBytesExpected/1024)+1]; //calc based on size.
-                    //    picPieceState = new bool[(picChunkState.Length / 8)+1];
-                    //    picExtraPackets = 0;//for debugging.
-                    //    picDownloading = true;
-//
-                    //    sendAckFileSize();
-                    //}
-                    //if(cmdId == 99)//jpeg
+                    if (cmdId == 98)//start jpeg.
                     {
-                      //  //var dataStr = BitConverter.ToString(received.bytes.Skip(0).Take(30).ToArray()).Replace("-", " ");
-//
-                      //  var start = 9;
-                      //  var fileNum = BitConverter.ToUInt16(received.bytes,start);
-                      //  start += 2;
-                      //  var pieceNum = BitConverter.ToUInt32(received.bytes, start);
-                      //  start += 4;
-                      //  var seqNum = BitConverter.ToUInt32(received.bytes, start);
-                      //  start += 4;
-                      //  var size = BitConverter.ToUInt16(received.bytes, start);
-                      //  start += 2;
-//
-                      //  maxPieceNum = Math.Max((int)pieceNum, maxPieceNum);
-                      //  if (!picChunkState[seqNum])
-                      //  {
-                      //      Array.Copy(received.bytes, start, picbuffer, seqNum * 1024, size);
-                      //      picBytesRecived += size;
-                      //      picChunkState[seqNum] = true;
-//
-                      //      for (int p = 0; p < picChunkState.Length / 8; p++)
-                      //      {
-                      //          var done = true;
-                      //          for (int s = 0; s < 8; s++)
-                      //          {
-                      //              if (!picChunkState[(p * 8) + s])
-                      //              {
-                      //                  done = false;
-                      //                  break;
-                      //              }
-                      //          }
-                      //          if (done && !picPieceState[p])
-                      //          {
-                      //              picPieceState[p] = true;
-                      //              sendAckFilePiece(0, fileNum, (UInt32)p);
-                      //              //Console.WriteLine("\nACK PN:" + p + " " + seqNum);
-                      //          }
-                      //      }
-                      //      if (picFilePath != null && picBytesRecived >= picBytesExpected)
-                      //      {
-                      //          picDownloading = false;
-//
-                      //          sendAckFilePiece(1, 0, (UInt32)maxPieceNum);//todo. Double check this. finalize
-//
-                      //          sendAckFileDone((int)picBytesExpected);
-//
-                      //          //HACK.
-                      //          //Send file done cmdId to the update listener so it knows the picture is done.
-                      //          //hack.
-                      //          onUpdate(100);
-                      //          //hack.
-                      //          //This is a hack because it is faking a message. And not a very good fake.
-                      //          //HACK.
-//
-                      //          //Console.WriteLine("\nDONE PN:" + pieceNum + " max: " + maxPieceNum);
-//
-                      //          //Save raw data minus sequence.
-                      //          //using (var stream = new FileStream(picFilePath, FileMode.Append))
-                      //          //{
-                      //          //    stream.Write(picbuffer, 0, (int)picBytesExpected);
-                      //          //}
-                      //      }
-                      //  }
-                      //  else
-                      //  {
-                      //      picExtraPackets++;//for debugging.
-//
-                      //      //if(picBytesRecived >= picBytesExpected)
-                      //      //    Console.WriteLine("\nEXTRA PN:"+pieceNum+" max "+ maxPieceNum);
-                      //  }
+                        //picFilePath = picPath + DateTime.Now.ToString("yyyy-dd-M--HH-mm-ss") + ".jpg";
+
+                        int start = 9;
+                        int ftype = recived[start];
+                        start += 1;
+                        picBytesExpected = BitConverter.toUint32(recived, start);
+                        Log.d("picBytesExpected", String.valueOf(picBytesExpected));
+                        if(picBytesExpected>picbuffer.length)
+                        {
+                            picbuffer = new byte[picBytesExpected];
+                        }
+                        picBytesRecived = 0;
+                        picChunkState = new boolean[Math.abs(picBytesExpected/1024)+1]; //calc based on size.
+                        picPieceState = new boolean[(picChunkState.length / 8)+1];
+                        picExtraPackets = 0;//for debugging.
+                        picDownloading = true;
+
+                        sendAckFileSize();
+                    }
+                    if (cmdId == 99)//jpeg
+                    {
+                        DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyy-dd-M--HH-mm-ss");
+                        //var dataStr = BitConverter.ToString(received.bytes.Skip(0).Take(30).ToArray()).Replace("-", " ");
+                        File file = new File(Environment.getExternalStoragePublicDirectory(
+                                Environment.DIRECTORY_PICTURES), "tello+/pic");
+                        if (!file.mkdirs()) {
+
+                        }
+                        File picFilePath = new File(file.getPath()+"/" + LocalDateTime.now().format(format).toString() + ".jpg");
+                        Log.d("picpath",picFilePath.getAbsolutePath());
+                        int start = 9;
+                        int fileNum = BitConverter.toUint16(recived,start);
+                        start += 2;
+                        int pieceNum = BitConverter.toUint32(recived, start);
+                        start += 4;
+                        int seqNum = BitConverter.toUint32(recived, start);
+                        start += 4;
+                        int size = BitConverter.toUint16(recived, start);
+                        start += 2;
+
+
+                        maxPieceNum = Math.max((int) pieceNum, maxPieceNum);
+                        if (!picChunkState[seqNum]) {
+                            System.arraycopy(recived, start, picbuffer, seqNum * 1024, size);
+                            picBytesRecived += size;
+                            picChunkState[seqNum] = true;
+
+                            for (int p = 0; p < picChunkState.length / 8; p++) {
+                                Boolean done = true;
+                                for (int s = 0; s < 8; s++) {
+                                    if (!picChunkState[(p * 8) + s]) {
+                                        done = false;
+                                        break;
+                                    }
+                                }
+                                if (done && !picPieceState[p]) {
+                                    picPieceState[p] = true;
+                                    sendAckFilePiece((byte) 0, fileNum, (int) p);
+                                    //Console.WriteLine("\nACK PN:" + p + " " + seqNum);
+                                }
+                            }
+                            if (picFilePath != null && picBytesRecived >= picBytesExpected) {
+                                picDownloading = false;
+                                runOnUiThread(new Runnable() {
+                                    public void run() {
+                                        Toast.makeText(getApplicationContext(),"Saved photo to: "+picFilePath.getAbsolutePath(),Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+
+
+                                sendAckFilePiece((byte) 1, 0, (int) maxPieceNum);//todo. Double check this. finalize
+
+                                sendAckFileDone((int) picBytesExpected);
+
+                                //HACK.
+                                //Send file done cmdId to the update listener so it knows the picture is done.
+                                //hack.
+                                //onUpdate(100);
+                                //hack.
+                                //This is a hack because it is faking a message. And not a very good fake.
+                                //HACK.
+
+                                ///Console.WriteLine("\nDONE PN:" + pieceNum + " max: " + maxPieceNum);
+
+                                //Save raw data minus sequence.
+                                FileOutputStream fos = new FileOutputStream(picFilePath);
+                                fos.write(picbuffer, 0, (int)picBytesExpected);
+                            }
+                        } else {
+                            picExtraPackets++;//for debugging.
+
+                            //if(picBytesRecived >= picBytesExpected)
+                            //    Console.WriteLine("\nEXTRA PN:"+pieceNum+" max "+ maxPieceNum);
+                        }
 
 
                     }
-                    if (cmdId == 100)
-                    {
+                    if (cmdId == 100) {
 
                     }
 
                     //send command to listeners.
-                    try
-                    {
+                    try {
                         //fire update event.
-                      //  onUpdate(cmdId);
-                    }
-                    catch (Exception ex)
-                    {
+                        //  onUpdate(cmdId);
+                    } catch (Exception ex) {
                         //Fixed. Update errors do not cause disconnect.
                         ex.printStackTrace();
                         //break;
                     }
 
 
-                }
+                }catch (Exception e){e.printStackTrace();}}
 
             } catch (IOException e) {
+                e.printStackTrace();
+            } catch (Exception e) {
                 e.printStackTrace();
             }
 
 
-                if (socketMainSending == null) {
-                    socketMainSending.close();
-                }}
+            if (socketMainSending == null) {
+                socketMainSending.close();
+            }
+        }
 
         public void kill() {
             bKeepRunning = false;

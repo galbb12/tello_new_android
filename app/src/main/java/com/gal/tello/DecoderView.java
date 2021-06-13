@@ -22,6 +22,7 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.TextureView;
+import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
 
@@ -37,7 +38,7 @@ import java.nio.ByteBuffer;
 public class DecoderView extends TextureView {
     byte[] buffer;
     private MediaCodec codec;
-    private boolean bConfigured;
+    private boolean bConfigured =false;
     //pic mode sps
     private byte[] sps = new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 60, (byte) 5, (byte) 185};
     private boolean bWaitForKeyframe = true;
@@ -63,7 +64,7 @@ public class DecoderView extends TextureView {
 
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-    private void Init() {
+    public void Init() {
         TextureView textureView=this;
         if (sps.length == 14)
             decoderWidth = 1280;
@@ -83,7 +84,6 @@ public class DecoderView extends TextureView {
 
             codec = cdx;
             bWaitForKeyframe = true;
-            bConfigured = true;
         } catch (Exception ex) {
             //handle
             ex.printStackTrace();
@@ -111,7 +111,10 @@ public class DecoderView extends TextureView {
                     lp.height = screenHeight;
                 }
                 // Commit the layout parameters
-                textureView.setLayoutParams(lp);}});
+                textureView.setLayoutParams(lp);
+                textureView.invalidate();
+                Log.d("Configured", "Configured");
+                bConfigured = true;}});
 
         return;
 
@@ -121,7 +124,7 @@ public class DecoderView extends TextureView {
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public void decode(byte[] array) {
         Log.d("decode", "decode");
-        if (bConfigured == false) {
+        if (!bConfigured) {
             Init();
         }
 
@@ -218,7 +221,9 @@ public class DecoderView extends TextureView {
     }
 
 
+
     private void Initialize() {
+
     }
 
     public void stop() {
@@ -233,21 +238,4 @@ public class DecoderView extends TextureView {
         }
         codec = null;
     }
-    private static byte[] YUV_420_888toNV21(Image image) {
-        byte[] nv21;
-        ByteBuffer yBuffer = image.getPlanes()[0].getBuffer();
-        ByteBuffer uBuffer = image.getPlanes()[1].getBuffer();
-        ByteBuffer vBuffer = image.getPlanes()[2].getBuffer();
-        int ySize = yBuffer.remaining();
-        int uSize = uBuffer.remaining();
-        int vSize = vBuffer.remaining();
-        nv21 = new byte[ySize + uSize + vSize];
-        //U and V are swapped
-        yBuffer.get(nv21, 0, ySize);
-        vBuffer.get(nv21, ySize, vSize);
-        uBuffer.get(nv21, ySize + vSize, uSize);
-        return nv21;
-    }
-
-
 }
