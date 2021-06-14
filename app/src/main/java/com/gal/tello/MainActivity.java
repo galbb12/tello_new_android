@@ -27,7 +27,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 
+import com.google.common.io.FileWriteMode;
+
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.ConnectException;
@@ -61,7 +64,7 @@ public class MainActivity extends AppCompatActivity {
     byte[] picbuffer = new byte[3000 * 1024];
     String picFilePath;
     boolean[] picPieceState;
-
+    File videoFilePath;
     VideoDatagramReceiver videoDatagramReceiver;
     StatusDatagramReceiver statusDatagramReceiver;
     connectionlistener connectionlistener;
@@ -72,6 +75,10 @@ public class MainActivity extends AppCompatActivity {
     Button takepicture;
     boolean[] picChunkState;
     TextView textViewBattery;
+    int rx =0;
+    int ry =0;
+    int lx =0;
+    int ly =0;
     int picBytesRecived;
     int height;
     int northSpeed;
@@ -179,12 +186,6 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 if(!picDownloading){
                 takePicture();}
-            }
-        });
-        joystickr.setOnMoveListener(new JoystickView.OnMoveListener() {
-            @Override
-            public void onMove(int angle, int strength) {
-
             }
         });
     }
@@ -300,10 +301,12 @@ public class MainActivity extends AppCompatActivity {
                             if (connect()!="") {
                                 Log.d("connected", "connected");
                                 connected = true;
+                                //Initialize();
                                 setAttAngle(25.0f);
                                 StartHeartBeatJoystick();
                                 activity = (Activity) MainActivity.this;
                                 setPicVidMode(0);
+                                setEis(1);
                                 streamon();
                                 startStatus();
                             }
@@ -377,11 +380,10 @@ public class MainActivity extends AppCompatActivity {
         try {
             socketMainSending = new DatagramSocket();
             inetAddressMainSending = getInetAddressByName(addressMainSending);
-            if (inetAddressMainSending == null) {
-
-            } else {
-
-            }
+            if(socketStreamOnServer==null || socketStreamOnServer.isClosed()){
+            socketStreamOnServer = new DatagramSocket(null);
+            InetSocketAddress addressVideo = new InetSocketAddress(6038);
+            socketStreamOnServer.bind(addressVideo);}
 
 
         } catch (IOException e) {
@@ -633,6 +635,20 @@ public class MainActivity extends AppCompatActivity {
             super.onPostExecute(s);
         }
     }
+    public void setEis(int value)
+    {
+        //                                          crc    typ  cmdL  cmdH  seqL  seqH  valL  crc   crc
+        byte[] packet = new byte[] {(byte) 0xcc, 0x60, 0x00, 0x27, 0x68, 0x24, 0x00, 0x09, 0x00, 0x00, 0x5b, (byte) 0xc5};
+
+        //payload
+        packet[9] = (byte)(value & 0xff);
+
+        setPacketSequence(packet);
+        setPacketCRCs(packet);
+
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay =new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(packet);
+    }
 
     public String connect() {
 
@@ -808,9 +824,6 @@ public class MainActivity extends AppCompatActivity {
 
     void StartRecivingVideoStream() {
         try {
-                socketStreamOnServer = new DatagramSocket(null);
-                InetSocketAddress addressVideo = new InetSocketAddress(6038);
-                socketStreamOnServer.bind(addressVideo);
                 if (!videoDatagramReceiver.isAlive()) {
                     try {
                         videoDatagramReceiver.start();//start listening for tello
@@ -879,16 +892,36 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+
     private class VideoDatagramReceiver extends Thread {
         private boolean bKeepRunning = true;
         public byte[] lmessage = new byte[1460];
         byte[] videoFrame = new byte[100 * 1024];
         int videoOffset = 0;
-
+        Boolean cache=true;
+        Boolean record=false;
+        FileOutputStream fos;
 
         @RequiresApi(api = Build.VERSION_CODES.O)
         @Override
         public void run() {
+            if(cache){
+            File file = new File(Environment.getExternalStoragePublicDirectory(
+                    Environment.DIRECTORY_DCIM), "tello+/cache");
+            if (!file.mkdirs()) {
+
+            }
+
+
+
+            DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyy-dd-M--HH-mm-ss");
+            videoFilePath = new File(file.getPath()+"/" + LocalDateTime.now().format(format).toString() + ".h264");
+
+            record=true;
+            }
+
+
+
             Log.d("video start", "start");
             DatagramPacket packet = new DatagramPacket(lmessage, lmessage.length);
 
@@ -897,13 +930,28 @@ public class MainActivity extends AppCompatActivity {
 
                 while (bKeepRunning) {
 
-                    socketStreamOnServer.receive(packet);
+                    try {
+                        socketStreamOnServer.receive(packet);
+                    } catch (IOException ioException) {
+
+
+                    }
                     byte[] data = new byte[packet.getLength()];
                     System.arraycopy(packet.getData(), 0, data, 0, packet.getLength());
+                    if (record) {
+                        if(fos==null){
+                            fos = new FileOutputStream(videoFilePath,true);
+                        }
+                        try {
+                            fos.write(data, 2, data.length - 2);
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }}
 
 
                     try {
                         if (data[2] == 0 && data[3] == 0 && data[4] == 0 && data[5] == 1) {
+
 
                             if (videoOffset > 0) {
                                 if (!isPaused) {
@@ -929,7 +977,9 @@ public class MainActivity extends AppCompatActivity {
                         }
 
 
-                    } catch (RuntimeException e) {
+
+
+                  }catch (RuntimeException e) {
                         e.printStackTrace();
                     }
 
@@ -940,11 +990,7 @@ public class MainActivity extends AppCompatActivity {
                     socketStreamOnServer.close();
                 }
 
-            } catch (IOException ioe) {
-
-            }
-
-        }
+        }catch (Exception e){e.printStackTrace();}}
 
         public void kill() {
             bKeepRunning = false;
@@ -991,10 +1037,9 @@ public class MainActivity extends AppCompatActivity {
             } catch (RuntimeException e) {
 
             }
-        }
+        }}
 
 
-    }
 
 
     void startStatus() {
@@ -1391,7 +1436,7 @@ public class MainActivity extends AppCompatActivity {
                         DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyy-dd-M--HH-mm-ss");
                         //var dataStr = BitConverter.ToString(received.bytes.Skip(0).Take(30).ToArray()).Replace("-", " ");
                         File file = new File(Environment.getExternalStoragePublicDirectory(
-                                Environment.DIRECTORY_PICTURES), "tello+/pic");
+                                Environment.DIRECTORY_DCIM), "tello+/pic");
                         if (!file.mkdirs()) {
 
                         }
