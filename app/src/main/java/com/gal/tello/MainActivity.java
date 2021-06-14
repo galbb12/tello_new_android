@@ -27,6 +27,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 
+
 import com.google.common.io.FileWriteMode;
 
 import java.io.File;
@@ -39,6 +40,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -50,9 +52,12 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 
 import io.github.controlwear.virtual.joystick.android.JoystickView;
+import nl.bravobit.ffmpeg.ExecuteBinaryResponseHandler;
+import nl.bravobit.ffmpeg.FFmpeg;
 //import nl.bravobit.ffmpeg.ExecuteBinaryResponseHandler;
 //import nl.bravobit.ffmpeg.FFmpeg;
 //import nl.bravobit.ffmpeg.FFtask;
+
 
 import static java.lang.Math.max;
 
@@ -62,8 +67,8 @@ import java.lang.*;
 
 public class MainActivity extends AppCompatActivity {
     byte[] picbuffer = new byte[3000 * 1024];
-    String picFilePath;
     boolean[] picPieceState;
+    File h264FilePath;
     File videoFilePath;
     VideoDatagramReceiver videoDatagramReceiver;
     StatusDatagramReceiver statusDatagramReceiver;
@@ -73,12 +78,9 @@ public class MainActivity extends AppCompatActivity {
     Button takeoff;
     Button connect;
     Button takepicture;
+    Button button_record;
     boolean[] picChunkState;
     TextView textViewBattery;
-    int rx =0;
-    int ry =0;
-    int lx =0;
-    int ly =0;
     int picBytesRecived;
     int height;
     int northSpeed;
@@ -137,6 +139,8 @@ public class MainActivity extends AppCompatActivity {
     HeartBeatStreamon heartBeatStreamon;
     HeartBeatJoystick heartBeatJoystick;
     BitConverter bitConverter;
+    Boolean record=false;
+    FileOutputStream fos;
 
 
     @Override
@@ -151,8 +155,9 @@ public class MainActivity extends AppCompatActivity {
         joystickr = (JoystickView) findViewById(R.id.joystickView);
         joystickl = (JoystickView) findViewById(R.id.joystickView1);
         takeoff = findViewById(R.id.TakeOff);
-        connect = findViewById(R.id.connect);
-        takepicture=findViewById(R.id.takepicture);
+        button_record = findViewById(R.id.record);
+        //connect = findViewById(R.id.connect);
+        takepicture = findViewById(R.id.takepicture);
         textViewBattery = findViewById(R.id.textViewbattery);
         controllerState = new ControllerState();
         BroadcastReceiver broadcastReceiver = new WifiBroadcastReceiver();
@@ -174,21 +179,110 @@ public class MainActivity extends AppCompatActivity {
                 takeoff();
             }
         });
-        connect.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                StartDroneConnection();
-            }
-        });
+        //connect.setOnClickListener(new View.OnClickListener() {
+        //    @Override
+        //    public void onClick(View view) {
+        //        StartDroneConnection();
+        //    }
+        //});
         StartDroneConnection();
         takepicture.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if(!picDownloading){
-                takePicture();}
+                if (!picDownloading) {
+                    takePicture();
+                }
             }
         });
+        button_record.setOnClickListener(new View.OnClickListener() {
+            @RequiresApi(api = Build.VERSION_CODES.O)
+            @Override
+            public void onClick(View view) {
+
+                if (record == false) {
+                    if (connected) {
+                        File filechache = new File(Environment.getExternalStoragePublicDirectory(
+                                Environment.DIRECTORY_DCIM), "tello+/cache");
+                        if (!filechache.mkdirs()) {
+
+                        }
+                        File filevideo = new File(Environment.getExternalStoragePublicDirectory(
+                                Environment.DIRECTORY_DCIM), "tello+/vid");
+                        if (!filevideo.mkdirs()) {
+                        }
+
+
+                        DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyy-dd-M--HH-mm-ss");
+                        h264FilePath = new File(filechache.getPath() + "/" + LocalDateTime.now().format(format).toString() + ".h264");
+                        videoFilePath = new File(filevideo.getPath() + "/" + LocalDateTime.now().format(format).toString() + ".mp4");
+                        button_record.setText("Stop recording");
+                        fos=null;
+                        record = true;
+                        Toast.makeText(activity, "Recording to: " + videoFilePath.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+                    } }else {
+
+                        ConvertRecording(h264FilePath.getAbsolutePath(), videoFilePath.getAbsolutePath());
+
+
+                    }
+                }
+        });
     }
+
+    void ConvertRecording(String h264input , String mp4output){
+
+       //    if (FFmpeg.getInstance(this).isSupported()) {
+       //        // ffmpeg is supported
+       //    } else {
+       //        // ffmpeg is not supported
+       //    }
+
+       // FFmpeg.executeAsync("-y -i "+h264input+" -vcodec copy "+mp4output, new ExecuteCallback() {
+
+       //    @Override
+       //    public void apply(final long executionId, final int returnCode) {
+       //        if (returnCode == RETURN_CODE_SUCCESS) {
+       //            Toast.makeText(activity,"File saved to: "+mp4output,Toast.LENGTH_LONG).show();
+       //        } else if (returnCode == RETURN_CODE_CANCEL) {
+       //            Log.i(Config.TAG, "Async command execution cancelled by user.");
+       //        } else {
+       //            Log.i(Config.TAG, String.format("Async command execution failed with returnCode=%d.", returnCode));
+       //        }
+       //    }
+       //});
+        if (FFmpeg.getInstance(this).isSupported()) {
+            FFmpeg ffmpeg = FFmpeg.getInstance(this);
+            String[] cmd= {"-y","-i",h264input, "-vcodec","copy" ,mp4output};
+            ffmpeg.execute(cmd, new ExecuteBinaryResponseHandler() {
+
+                @Override
+                public void onStart() {}
+
+                @Override
+                public void onProgress(String message) {}
+
+                @Override
+                public void onFailure(String message) {
+                    Log.e("ffmpeg error",message);
+                }
+
+                @Override
+                public void onSuccess(String message) {
+                    Toast.makeText(getApplicationContext(),"File saved to: "+mp4output,Toast.LENGTH_LONG).show();
+                }
+
+                @Override
+                public void onFinish() {}
+
+            });
+        } else {
+            // ffmpeg is not supported
+        }
+        record = false;
+        button_record.setText("Record");
+        }
+
+
 
 
     private void hideSystemUI() {
@@ -898,27 +992,12 @@ public class MainActivity extends AppCompatActivity {
         public byte[] lmessage = new byte[1460];
         byte[] videoFrame = new byte[100 * 1024];
         int videoOffset = 0;
-        Boolean cache=true;
-        Boolean record=false;
-        FileOutputStream fos;
 
         @RequiresApi(api = Build.VERSION_CODES.O)
         @Override
         public void run() {
-            if(cache){
-            File file = new File(Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_DCIM), "tello+/cache");
-            if (!file.mkdirs()) {
-
-            }
 
 
-
-            DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyy-dd-M--HH-mm-ss");
-            videoFilePath = new File(file.getPath()+"/" + LocalDateTime.now().format(format).toString() + ".h264");
-
-            record=true;
-            }
 
 
 
@@ -939,14 +1018,15 @@ public class MainActivity extends AppCompatActivity {
                     byte[] data = new byte[packet.getLength()];
                     System.arraycopy(packet.getData(), 0, data, 0, packet.getLength());
                     if (record) {
+                        if(h264FilePath!=null){
                         if(fos==null){
-                            fos = new FileOutputStream(videoFilePath,true);
+                            fos = new FileOutputStream(h264FilePath,true);
                         }
                         try {
                             fos.write(data, 2, data.length - 2);
                         } catch (IOException e) {
                             e.printStackTrace();
-                        }}
+                        }}}
 
 
                     try {
@@ -1337,6 +1417,11 @@ public class MainActivity extends AppCompatActivity {
 
             byte[] lmessage = new byte[2048];
             DatagramPacket packet = new DatagramPacket(lmessage, lmessage.length);
+            try {
+                socketMainSending.setSoTimeout(1000);
+            } catch (SocketException e) {
+                e.printStackTrace();
+            }
 
             try {
 

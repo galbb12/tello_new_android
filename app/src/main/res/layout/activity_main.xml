@@ -22,27 +22,29 @@
         android:id="@+id/TakeOff"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="162dp"
-        android:layout_marginEnd="162dp"
-        android:layout_marginBottom="8dp"
+        android:alpha="1"
         android:text="take off"
-        app:layout_constraintBottom_toTopOf="@+id/connect"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.501"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:backgroundTint="#7EFFFFFF"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/takepicture"
+        app:layout_constraintHorizontal_bias="0.958"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.0" />
 
     <Button
-        android:id="@+id/connect"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="161dp"
-        android:layout_marginEnd="162dp"
-        android:layout_marginBottom="16dp"
-        android:text="connect"
+        android:id="@+id/record"
+        android:layout_width="134dp"
+        android:layout_height="61dp"
+        android:alpha="1"
+        android:text="Record"
+        app:backgroundTint="#7EFFFFFF"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.501"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintEnd_toStartOf="@+id/TakeOff"
+        app:layout_constraintHorizontal_bias="0.525"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.0" />
 
     <io.github.controlwear.virtual.joystick.android.JoystickView
         android:id="@+id/joystickView"
@@ -50,9 +52,12 @@
         android:layout_height="300dp"
         android:layout_marginStart="450dp"
         android:layout_marginTop="75dp"
+        android:alpha="10"
         app:JV_autoReCenterButton="true"
-        app:JV_backgroundColor="#66009688"
-        app:JV_borderWidth="15dp"
+        app:JV_backgroundColor="#B7000000"
+        app:JV_borderColor="#27FFFFFF"
+        app:JV_borderWidth="1dp"
+        app:JV_buttonColor="#FFFFFF"
         app:JV_buttonStickToBorder="false"
         app:JV_enabled="true"
         app:JV_fixedCenter="true"
@@ -67,9 +72,12 @@
         android:layout_height="300dp"
         android:layout_marginTop="75dp"
         android:layout_marginEnd="450dp"
+        android:alpha="10"
         app:JV_autoReCenterButton="true"
-        app:JV_backgroundColor="#66009688"
-        app:JV_borderWidth="15dp"
+        app:JV_backgroundColor="#B7000000"
+        app:JV_borderColor="#FFFFFF"
+        app:JV_borderWidth="1dp"
+        app:JV_buttonColor="#FFFFFF"
         app:JV_buttonStickToBorder="false"
         app:JV_enabled="true"
         app:JV_fixedCenter="true"
@@ -78,31 +86,35 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <TextView
-        android:id="@+id/textViewbattery"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Battery:N/A"
-        android:textColor="#2196F3"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.16"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.04000002" />
-
     <Button
         android:id="@+id/takepicture"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="50dp"
-        android:layout_marginBottom="25dp"
+        android:alpha="1"
         android:text="Take picture"
+        app:backgroundTint="#7EFFFFFF"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.988"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.616" />
+        app:layout_constraintVertical_bias="0.0" />
+
+    <TextView
+        android:id="@+id/textViewbattery"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="7dp"
+        android:alpha="2"
+        android:text="Battery:N/A"
+        android:textColor="#7EFFFFFF"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/record"
+        app:layout_constraintHorizontal_bias="0.48"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.04" />
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>
