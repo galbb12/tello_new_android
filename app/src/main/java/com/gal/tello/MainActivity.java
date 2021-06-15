@@ -135,7 +135,7 @@ public class MainActivity extends AppCompatActivity {
     static ControllerState controllerState;
     static JoystickView joystickr;
     static JoystickView joystickl;
-    int iFrameRate = 10;
+    int iFrameRate = 7;
     HeartBeatStreamon heartBeatStreamon;
     HeartBeatJoystick heartBeatJoystick;
     BitConverter bitConverter;
@@ -303,40 +303,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     void StartDroneConnection() {
-        // final Handler ha = new Handler();
-        // ha.postDelayed(new Runnable() {
-//
-        //     @Override
-        //     public void run() {
-        //         //call function
-        //         if (connected == false) {
-        //             if (lastreplay != null) {
-        //                 Log.d("connected", "connected");
-        //                 connected = true;
-        //                 setAttAngle(25.0f);
-        //                 StartHeartBeatJoystick();
-        //                 streamon();
-        //             } else {
-        //                 Initialize();
-        //                 connect();
-//
-        //             }
-//
-//
-        //             ha.postDelayed(this, 1000);
-        //         }
-        //     }
-//
-        // }, 0);
-
+        startStatus();
         try {
             if (!connectionlistener.isAlive()) {
-                connectionlistener.join();
-                connectionlistener = new connectionlistener();
+                connectionlistener.start();
             }
-            connectionlistener.start();//start listening for tello
 
-        } catch (RuntimeException | InterruptedException e) {
+        } catch ( RuntimeException e) {
             e.printStackTrace();
         }
 
@@ -392,18 +365,7 @@ public class MainActivity extends AppCompatActivity {
                     if (mWifi.isConnected()) {
                         String ip = Formatter.formatIpAddress(wifiManager.getConnectionInfo().getIpAddress());
                         if (ip.startsWith("192.168.10.")) {
-                            if (connect()!="") {
-                                Log.d("connected", "connected");
-                                connected = true;
-                                //Initialize();
-                                setAttAngle(25.0f);
-                                StartHeartBeatJoystick();
-                                activity = (Activity) MainActivity.this;
-                                setPicVidMode(0);
-                                setEis(1);
-                                streamon();
-                                startStatus();
-                            }
+                           connect();
                         }
                     }
 
@@ -472,12 +434,13 @@ public class MainActivity extends AppCompatActivity {
     public void Initialize() {
 
         try {
-            socketMainSending = new DatagramSocket();
+
+            if(socketStreamOnServer==null || socketStreamOnServer.isClosed()){ socketMainSending = new DatagramSocket();
             inetAddressMainSending = getInetAddressByName(addressMainSending);
-            if(socketStreamOnServer==null || socketStreamOnServer.isClosed()){
             socketStreamOnServer = new DatagramSocket(null);
             InetSocketAddress addressVideo = new InetSocketAddress(6038);
-            socketStreamOnServer.bind(addressVideo);}
+            socketStreamOnServer.bind(addressVideo);
+            socketMainSending.setSoTimeout(1000);}
 
 
         } catch (IOException e) {
@@ -644,8 +607,6 @@ public class MainActivity extends AppCompatActivity {
         SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
         sendOneBytePacketWithoutReplay.execute(packet);
 
-        DecoderView imageView = findViewById(R.id.decoderView);
-        imageView.Init();
     }
 
     void setEV(int ev) {
@@ -744,31 +705,21 @@ public class MainActivity extends AppCompatActivity {
         sendOneBytePacketWithoutReplay.execute(packet);
     }
 
-    public String connect() {
+    public void connect() {
 
-        String replay = "";
         try {
-            Initialize();
-            //InetSocketAddress addressStatus = new InetSocketAddress(8890);
-            //socketMainSending.connect(addressStatus);
-            // if(!socketMainSending.isConnected()){
-            // socketMainSending.connect(inetAddressMainSending,3000);}
-
             String connectstring = "conn_req:lh";
-
             byte[] connectPacket = connectstring.getBytes(StandardCharsets.UTF_8);
             connectPacket[9] = (byte) (6038 & 0x96);
             connectPacket[10] = 6038 >> 8;
-            Log.d("connect packet", new String(connectPacket, StandardCharsets.UTF_8));
-            SendOneBytePacket sendOneBytePacket = new SendOneBytePacket();
-            replay = sendOneBytePacket.execute(connectPacket).get();
-            Log.d("connect replay", replay);
+            Log.d("connectPacket",new String(connectPacket, StandardCharsets.UTF_8));
+            SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
+            sendOneBytePacketWithoutReplay.execute(connectPacket);
 
 
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return replay;
     }
 
     public void takeoff() {
@@ -1125,12 +1076,11 @@ public class MainActivity extends AppCompatActivity {
     void startStatus() {
         try {
             if (!statusDatagramReceiver.isAlive()) {
-                statusDatagramReceiver.join();
-                statusDatagramReceiver = new StatusDatagramReceiver();
+                Initialize();
+                statusDatagramReceiver.start();
             }
-            statusDatagramReceiver.start();//start listening for tello
 
-        } catch (RuntimeException | InterruptedException e) {
+        } catch (RuntimeException e) {
             e.printStackTrace();
         }
 
@@ -1417,21 +1367,28 @@ public class MainActivity extends AppCompatActivity {
 
             byte[] lmessage = new byte[2048];
             DatagramPacket packet = new DatagramPacket(lmessage, lmessage.length);
-            try {
-                socketMainSending.setSoTimeout(1000);
-            } catch (SocketException e) {
-                e.printStackTrace();
-            }
 
             try {
 
                 while (bKeepRunning) {
+                    if(socketMainSending!=null){
+                        try {
                     socketMainSending.receive(packet);
+                    socketMainSending.setSoTimeout(1000);
                     byte[] recived = new byte[packet.getLength()];
                     System.arraycopy(packet.getData(), 0, recived, 0, packet.getLength());
                     int cmdId = ((int) recived[5] | ((int) recived[6] << 8));
                     Log.d("Cmd id", String.valueOf(cmdId));
-                    try {
+                     String dataString= new String(packet.getData(), StandardCharsets.UTF_8);
+                     if(dataString.startsWith("conn_ack")&&connected==false){
+                         connected = true;
+                         setAttAngle(25.0f);
+                         StartHeartBeatJoystick();
+                         activity = (Activity) MainActivity.this;
+                         setPicVidMode(0);
+                         setEis(1);
+                         streamon();
+                     }
                     if (cmdId >= 74 && cmdId < 80) {
                         //Console.WriteLine("XXXXXXXXCMD:" + cmdId);
                     }
@@ -1609,10 +1566,8 @@ public class MainActivity extends AppCompatActivity {
                     }
 
 
-                }catch (Exception e){e.printStackTrace();}}
+                }catch (Exception e){e.printStackTrace();}}}
 
-            } catch (IOException e) {
-                e.printStackTrace();
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -1628,66 +1583,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private class MessageDatagramReceiver extends Thread {
-        private boolean bKeepRunning = true;
-        private String lastMessage = "";
-
-        //@Override
-        //public void run() {
-        //    String message;
-        //    byte[] lmessage = new byte[500];
-        //    DatagramPacket packet = new DatagramPacket(lmessage, lmessage.length);
-//
-        //    try {
-//
-        //        while(bKeepRunning) {
-        //            socketStatusServer.receive(packet);
-        //            message = new String(lmessage, 0, packet.getLength());
-        //            lastMessage = message;
-        //            Log.d("message",message);
-        //            Thread.sleep(200);
-//
-        //        }
-//
-        //        if (socketStatusServer == null) {
-        //            socketStatusServer.close();
-        //        }
-//
-        //    } catch (IOException | InterruptedException ioe){
-//
-        //    }
-//
-        //}
-        @Override
-        public void run() {
-            Log.d("video start", "start");
-            byte[] lmessage = new byte[500];
-            DatagramPacket packet = new DatagramPacket(lmessage, lmessage.length);
-            String message = "";
-            try {
-                while (bKeepRunning) {
-                    socketStatusServer.receive(packet);
-                    try {
-                        socketStatusServer.receive(packet);
-                        message = new String(lmessage, 0, packet.getLength());
-                        lastMessage = message;
-                        Log.d("message", message);
-
-                    } catch (RuntimeException e) {
-                        Log.e("error", e.toString());
-                    }
-                }
-                if (socketStatusServer == null) {
-                    socketStatusServer.close();
-                }
-            } catch (IOException ioe) {
-            }
-        }
-
-        public void kill() {
-            bKeepRunning = false;
-        }
-    }
 
     @Override
     public void onPause() {
