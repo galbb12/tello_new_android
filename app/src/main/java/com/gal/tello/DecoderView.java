@@ -66,10 +66,10 @@ public class DecoderView extends TextureView {
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public void Init() {
         TextureView textureView=this;
-        if (sps.length == 14)
-            decoderWidth = 1280;
-        else
-            decoderWidth = 960;
+        if (sps.length == 14){
+            decoderWidth = 1280;}
+        else{
+            decoderWidth = 960;}
 
         MediaFormat videoFormat = MediaFormat.createVideoFormat("video/avc", decoderWidth, decoderHeight);
         videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
@@ -86,6 +86,8 @@ public class DecoderView extends TextureView {
             bWaitForKeyframe = true;
         } catch (Exception ex) {
             //handle
+          //bConfigured=false;
+          // Init();
             ex.printStackTrace();
         }
         (MainActivity.activity).runOnUiThread(new Runnable() {
@@ -140,7 +142,7 @@ public class DecoderView extends TextureView {
             return;
         }
         if (nalType == 8) {
-            //pps = array.ToArray();
+            pps = array;
             return;
         }
         if (bConfigured == false) {
@@ -217,7 +219,7 @@ public class DecoderView extends TextureView {
 
                 stop();
             }
-        }
+        }else{stop();}
     }
 
 

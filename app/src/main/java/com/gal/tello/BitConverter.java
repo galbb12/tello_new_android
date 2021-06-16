@@ -1,11 +1,5 @@
 package com.gal.tello;
 
-import android.os.Build;
-
-import androidx.annotation.RequiresApi;
-import androidx.collection.ArraySet;
-
-import com.google.common.primitives.UnsignedInteger;
 
 import java.nio.ByteOrder;
 import java.util.Arrays;

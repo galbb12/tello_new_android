@@ -51,12 +51,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 
+
 import io.github.controlwear.virtual.joystick.android.JoystickView;
 import nl.bravobit.ffmpeg.ExecuteBinaryResponseHandler;
 import nl.bravobit.ffmpeg.FFmpeg;
-//import nl.bravobit.ffmpeg.ExecuteBinaryResponseHandler;
-//import nl.bravobit.ffmpeg.FFmpeg;
-//import nl.bravobit.ffmpeg.FFtask;
 
 
 import static java.lang.Math.max;
@@ -81,6 +79,7 @@ public class MainActivity extends AppCompatActivity {
     Button button_record;
     boolean[] picChunkState;
     TextView textViewBattery;
+    TextView textViewTemp;
     int picBytesRecived;
     int height;
     int northSpeed;
@@ -135,7 +134,7 @@ public class MainActivity extends AppCompatActivity {
     static ControllerState controllerState;
     static JoystickView joystickr;
     static JoystickView joystickl;
-    int iFrameRate = 7;
+    int iFrameRate = 4;
     HeartBeatStreamon heartBeatStreamon;
     HeartBeatJoystick heartBeatJoystick;
     BitConverter bitConverter;
@@ -152,6 +151,7 @@ public class MainActivity extends AppCompatActivity {
         activity = (Activity) this;
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
         StrictMode.setThreadPolicy(policy);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         joystickr = (JoystickView) findViewById(R.id.joystickView);
         joystickl = (JoystickView) findViewById(R.id.joystickView1);
         takeoff = findViewById(R.id.TakeOff);
@@ -159,6 +159,7 @@ public class MainActivity extends AppCompatActivity {
         //connect = findViewById(R.id.connect);
         takepicture = findViewById(R.id.takepicture);
         textViewBattery = findViewById(R.id.textViewbattery);
+        textViewTemp = findViewById(R.id.textViewTemp);
         controllerState = new ControllerState();
         BroadcastReceiver broadcastReceiver = new WifiBroadcastReceiver();
         IntentFilter intentFilter = new IntentFilter();
@@ -213,8 +214,8 @@ public class MainActivity extends AppCompatActivity {
 
 
                         DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyy-dd-M--HH-mm-ss");
-                        h264FilePath = new File(filechache.getPath() + "/" + LocalDateTime.now().format(format).toString() + ".h264");
-                        videoFilePath = new File(filevideo.getPath() + "/" + LocalDateTime.now().format(format).toString() + ".mp4");
+                        h264FilePath = new File(filechache.getPath() + "/" + LocalDateTime.now().format(format) + ".h264");
+                        videoFilePath = new File(filevideo.getPath() + "/" + LocalDateTime.now().format(format) + ".mp4");
                         button_record.setText("Stop recording");
                         fos=null;
                         record = true;
@@ -224,10 +225,12 @@ public class MainActivity extends AppCompatActivity {
                         ConvertRecording(h264FilePath.getAbsolutePath(), videoFilePath.getAbsolutePath());
 
 
+
                     }
                 }
         });
     }
+
 
     void ConvertRecording(String h264input , String mp4output){
 
@@ -322,10 +325,9 @@ public class MainActivity extends AppCompatActivity {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             Log.d("Wifi Action", action);
-
-
+            if(connected){
             connected = false;
-            StartDroneConnection();
+            StartDroneConnection();}
 
         }
 
@@ -370,7 +372,7 @@ public class MainActivity extends AppCompatActivity {
                     }
 
 
-                    Thread.sleep(500);
+                    Thread.sleep(50);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -403,7 +405,6 @@ public class MainActivity extends AppCompatActivity {
         float lx = Float.parseFloat(df.format(Math.abs(l[0]) < deadBand ? 0.0f : l[0]));//(((float)joystickl.getNormalizedX()-50.0f)/50);
         float ly = Float.parseFloat(df.format(Math.abs(l[1]) < deadBand ? 0.0f : l[1]));//(((float)joystickl.getNormalizedY()-50.0f)/50);
          Log.d("joystick", "rx: " + rx + " " + "ry: " + ry + " " + "lx: " + lx + " " + "ly: " + ly+" " + "ly: " + ly);
-        controllerState.setSpeedMode(1);
         controllerState.setAxis(lx, -ly, rx, -ry);
         sendControllerUpdate();
     }
@@ -434,18 +435,20 @@ public class MainActivity extends AppCompatActivity {
     public void Initialize() {
 
         try {
+             if(socketMainSending==null){
 
-            if(socketStreamOnServer==null || socketStreamOnServer.isClosed()){ socketMainSending = new DatagramSocket();
-            inetAddressMainSending = getInetAddressByName(addressMainSending);
-            socketStreamOnServer = new DatagramSocket(null);
+                socketMainSending = new DatagramSocket();
+            inetAddressMainSending = getInetAddressByName(addressMainSending);}
+            if(socketStreamOnServer==null || socketStreamOnServer.isClosed()){
+                socketStreamOnServer = new DatagramSocket(null);
             InetSocketAddress addressVideo = new InetSocketAddress(6038);
-            socketStreamOnServer.bind(addressVideo);
-            socketMainSending.setSoTimeout(1000);}
-
-
-        } catch (IOException e) {
-            Log.e("IOException", e.toString());
+            socketStreamOnServer.bind(addressVideo);}
+        } catch (SocketException socketException) {
+            socketException.printStackTrace();
         }
+
+
+
 
 
     }
@@ -529,6 +532,32 @@ public class MainActivity extends AppCompatActivity {
         SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
         sendOneBytePacketWithoutReplay.execute(packet);
     }
+    void setBatteryLowLevel(int percentage) {
+        //                                          crc    typ  cmdL  cmdH  seqL  seqH  rateL  crc   crc
+        byte[] packet = new byte[]{(byte) 0xcc, 0x60, 0x00, 0x27, 0x68, (byte) 0x1055, 0x00, 0x09, 0x00, 0x00, 0x5b, (byte) 0xc5};
+
+        //payload
+        packet[9] = (byte) percentage;
+
+        setPacketSequence(packet);
+        setPacketCRCs(packet);
+
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(packet);
+    }
+    void setAttitude(int attitude) {
+        //                                          crc    typ  cmdL  cmdH  seqL  seqH  rateL  crc   crc
+        byte[] packet = new byte[]{(byte) 0xcc, 0x60, 0x00, 0x27, 0x68, (byte) 0x1059, 0x00, 0x09, 0x00, 0x00, 0x5b, (byte) 0xc5};
+
+        //payload
+        packet[9] = (byte) attitude;
+
+        setPacketSequence(packet);
+        setPacketCRCs(packet);
+
+        SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
+        sendOneBytePacketWithoutReplay.execute(packet);
+    }
 
     void setVideoDynRate(int rate) {
         //                                          crc    typ  cmdL  cmdH  seqL  seqH  rateL  crc   crc
@@ -571,7 +600,7 @@ public class MainActivity extends AppCompatActivity {
         byte[] packet = new byte[]{(byte) 0xcc, 0x78, 0x00, 0x27, 0x68, 0x58, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5b, (byte) 0xc5};
 
         //payload
-        byte[] bytes = ByteBuffer.allocate(4).putFloat(angle).array();
+        byte[] bytes = BitConverter.getBytes(angle);
         packet[9] = bytes[0];
         packet[10] = bytes[1];
         packet[11] = bytes[2];
@@ -624,7 +653,7 @@ public class MainActivity extends AppCompatActivity {
         sendOneBytePacketWithoutReplay.execute(packet);
     }
 
-    void requestIframe() {
+    public void requestIframe() {
         byte[] iframePacket = new byte[]{(byte) 0xcc, 0x58, 0x00, 0x7c, 0x60, 0x25, 0x00, 0x00, 0x00, 0x6c, (byte) 0x95};
         SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
         sendOneBytePacketWithoutReplay.execute(iframePacket);
@@ -775,7 +804,7 @@ public class MainActivity extends AppCompatActivity {
 
         float boost = 0.0f;
         if (controllerState.speed > 0)
-            boost = 1.0f;
+            boost = 2.0f;
 
         //var limit = 1.0f;//Slow down while testing.
         //rx = rx * limit;
@@ -870,12 +899,7 @@ public class MainActivity extends AppCompatActivity {
     void StartRecivingVideoStream() {
         try {
                 if (!videoDatagramReceiver.isAlive()) {
-                    try {
                         videoDatagramReceiver.start();//start listening for tello
-                    } catch (RuntimeException e) {
-
-
-                }
                 isstreamon = true;
             }
         } catch (Exception e) {
@@ -948,8 +972,8 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void run() {
 
-
-
+            DecoderView imageView = findViewById(R.id.decoderView);
+            byte[] videoFramenew;
 
 
             Log.d("video start", "start");
@@ -986,15 +1010,11 @@ public class MainActivity extends AppCompatActivity {
 
                             if (videoOffset > 0) {
                                 if (!isPaused) {
-                                    sendControllerUpdate();
-                                    DecoderView imageView = findViewById(R.id.decoderView);
-                                    byte[] videoFramenew = new byte[videoOffset];
+                                    videoFramenew = new byte[videoOffset];
                                     System.arraycopy(videoFrame, 0, videoFramenew, 0, videoOffset);
                                     imageView.decode(videoFramenew);
-                                    // b= imageView.getBitmap();
-                                    // b.compress(Bitmap.CompressFormat.PNG,0, new FileOutputStream(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).toString()+System.nanoTime()+"/tello.png") );
                                     videoOffset = 0;
-                                    // videoFrame = new byte[1460 * 100];
+                                    videoFrame = new byte[100 * 1024];
                                 }
                             }
                         }
@@ -1102,7 +1122,7 @@ public class MainActivity extends AppCompatActivity {
                     setcontrolleraxis();
                 }
                 try {
-                    Thread.sleep(50);
+                    Thread.sleep(8);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -1218,6 +1238,7 @@ public class MainActivity extends AppCompatActivity {
             frontLSC = (data[index] >> 2 & 0x1) == 1 ? true : false;
             index += 1;
             temperatureHeight = (data[index] >> 0 & 0x1);//23
+            textViewTemp.setText(temperatureHeight);
 
             wifiStrength = 0;//Wifi str comes in a cmd.
         } catch (RuntimeException e) {
@@ -1382,11 +1403,15 @@ public class MainActivity extends AppCompatActivity {
                      String dataString= new String(packet.getData(), StandardCharsets.UTF_8);
                      if(dataString.startsWith("conn_ack")&&connected==false){
                          connected = true;
+                         setPicVidMode(1);
+                         setEis(0);
+                         controllerState.setSpeedMode(1);
                          setAttAngle(25.0f);
                          StartHeartBeatJoystick();
                          activity = (Activity) MainActivity.this;
-                         setPicVidMode(0);
-                         setEis(1);
+                         setVideoBitRate(3);
+                         setBatteryLowLevel(10);
+                         setAttitude(30);
                          streamon();
                      }
                     if (cmdId >= 74 && cmdId < 80) {
@@ -1566,7 +1591,7 @@ public class MainActivity extends AppCompatActivity {
                     }
 
 
-                }catch (Exception e){e.printStackTrace();}}}
+                }catch (Exception e){}}}
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -1601,8 +1626,14 @@ public class MainActivity extends AppCompatActivity {
     public void onResume() {
         super.onResume();
         isPaused = false;
-        getSupportActionBar().hide();
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        // StartRecivingVideoStream();
+
+
+    }
+    @Override
+    public void onStart() {
+        super.onStart();
+        isPaused = false;
         // StartRecivingVideoStream();
 
 
