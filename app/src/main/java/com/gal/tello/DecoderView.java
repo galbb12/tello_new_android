@@ -71,7 +71,7 @@ public class DecoderView extends TextureView {
         else{
             decoderWidth = 960;}
 
-        MediaFormat videoFormat = MediaFormat.createVideoFormat("video/avc", decoderWidth, decoderHeight);
+        MediaFormat videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
         videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
         videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
 
@@ -88,6 +88,7 @@ public class DecoderView extends TextureView {
             //handle
           //bConfigured=false;
           // Init();
+            stop();
             ex.printStackTrace();
         }
         (MainActivity.activity).runOnUiThread(new Runnable() {
@@ -114,7 +115,6 @@ public class DecoderView extends TextureView {
                 }
                 // Commit the layout parameters
                 textureView.setLayoutParams(lp);
-                textureView.invalidate();
                 Log.d("Configured", "Configured");
                 bConfigured = true;}});
 
@@ -160,12 +160,11 @@ public class DecoderView extends TextureView {
 
         if (bConfigured) {
             try {
-                ByteBuffer[] inputBuffers = codec.getInputBuffers();
-                ByteBuffer[] outputBuffers = codec.getOutputBuffers();
                 int dequeueInputBuffer = codec.dequeueInputBuffer(-1L);
+                ByteBuffer inputBuffer = codec.getInputBuffer(dequeueInputBuffer);
                 if (dequeueInputBuffer >= 0) {
                     //Send data to decoder.
-                    ByteBuffer byteBuffer = inputBuffers[dequeueInputBuffer];
+                    ByteBuffer byteBuffer = inputBuffer;
                     byteBuffer.clear();
                     byteBuffer.put(array);
                     codec.queueInputBuffer(dequeueInputBuffer, 0, array.length, 0L, 0);

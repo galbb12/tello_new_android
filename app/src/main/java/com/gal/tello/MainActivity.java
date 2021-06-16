@@ -27,11 +27,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 
-
-import com.google.common.io.FileWriteMode;
-
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.ConnectException;
@@ -43,7 +39,6 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.time.LocalDateTime;
@@ -68,6 +63,9 @@ public class MainActivity extends AppCompatActivity {
     boolean[] picPieceState;
     File h264FilePath;
     File videoFilePath;
+    WifiManager wifiManager;
+    ConnectivityManager connManager;
+    NetworkInfo mWifi;
     VideoDatagramReceiver videoDatagramReceiver;
     StatusDatagramReceiver statusDatagramReceiver;
     connectionlistener connectionlistener;
@@ -134,7 +132,7 @@ public class MainActivity extends AppCompatActivity {
     static ControllerState controllerState;
     static JoystickView joystickr;
     static JoystickView joystickl;
-    int iFrameRate = 4;
+    int iFrameRate = 6;
     HeartBeatStreamon heartBeatStreamon;
     HeartBeatJoystick heartBeatJoystick;
     BitConverter bitConverter;
@@ -161,6 +159,9 @@ public class MainActivity extends AppCompatActivity {
         textViewBattery = findViewById(R.id.textViewbattery);
         textViewTemp = findViewById(R.id.textViewTemp);
         controllerState = new ControllerState();
+        wifiManager = (WifiManager) getApplication().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        connManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
         BroadcastReceiver broadcastReceiver = new WifiBroadcastReceiver();
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(WifiManager.SUPPLICANT_STATE_CHANGED_ACTION);
@@ -308,9 +309,10 @@ public class MainActivity extends AppCompatActivity {
     void StartDroneConnection() {
         startStatus();
         try {
-            if (!connectionlistener.isAlive()) {
-                connectionlistener.start();
+            if (connectionlistener.isAlive()) {
+             connectionlistener.kill();
             }
+            connectionlistener.start();
 
         } catch ( RuntimeException e) {
             e.printStackTrace();
@@ -327,7 +329,9 @@ public class MainActivity extends AppCompatActivity {
             Log.d("Wifi Action", action);
             if(connected){
             connected = false;
-            StartDroneConnection();}
+            StartDroneConnection();
+            DecoderView decoderView = findViewById(R.id.decoderView);
+            decoderView.stop(); }
 
         }
 
@@ -356,14 +360,12 @@ public class MainActivity extends AppCompatActivity {
 
     class connectionlistener extends Thread {
 
+        Boolean BKeepRunning = true;
         @Override
         public void run() {
             Log.d("connecting", "connecting to tello");
-            while (!connected) {
+            while (!connected&&BKeepRunning) {
                 try {
-                    WifiManager wifiManager = (WifiManager) getApplication().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-                    ConnectivityManager connManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-                    NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
                     if (mWifi.isConnected()) {
                         String ip = Formatter.formatIpAddress(wifiManager.getConnectionInfo().getIpAddress());
                         if (ip.startsWith("192.168.10.")) {
@@ -377,6 +379,9 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
             }
+        }
+        public void kill(){
+            BKeepRunning=false;
         }
     }
 
@@ -394,7 +399,7 @@ public class MainActivity extends AppCompatActivity {
 
 
     @RequiresApi(api = Build.VERSION_CODES.O)
-    static void setcontrolleraxis() {
+     void setcontrolleraxis() {
         float deadBand = 0.15f;
         DecimalFormat df = new DecimalFormat("#.#");
 
@@ -660,11 +665,14 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    public static class SendOneBytePacketWithoutReplay extends AsyncTask<byte[], String, String> {
+    public class SendOneBytePacketWithoutReplay extends AsyncTask<byte[], Void, Void> {
 
 
         @Override
-        public String doInBackground(byte[]... bytes) {
+        public Void doInBackground(byte[]... bytes) {
+            if (mWifi.isConnected()) {
+                String ip = Formatter.formatIpAddress(wifiManager.getConnectionInfo().getIpAddress());
+                if (ip.startsWith("192.168.10.")) {
             byte[] buf = bytes[0];
             DatagramPacket packet = new DatagramPacket(buf, buf.length, inetAddressMainSending, portMainSending);
             try {
@@ -676,12 +684,9 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception e) {
                 Log.e("Exception", e.getMessage());
             }
-            return null;
-        }
+        }}
 
-        @Override
-        protected void onPostExecute(String s) {
-            super.onPostExecute(s);
+            return null;
         }
     }
 
@@ -798,7 +803,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
-    static void sendControllerUpdate() {
+    void sendControllerUpdate() {
         //if (!connected)
         //    return;
 
@@ -964,7 +969,7 @@ public class MainActivity extends AppCompatActivity {
 
     private class VideoDatagramReceiver extends Thread {
         private boolean bKeepRunning = true;
-        public byte[] lmessage = new byte[1460];
+        public byte[] lmessage = new byte[5840];
         byte[] videoFrame = new byte[100 * 1024];
         int videoOffset = 0;
 
@@ -1309,7 +1314,7 @@ public class MainActivity extends AppCompatActivity {
             pos += len;
         }
     }*/
-    public static void sendAckFilePiece(byte endFlag,int fileId, int pieceId)
+    public void sendAckFilePiece(byte endFlag,int fileId, int pieceId)
     {
         //                                          crc    typ  cmdL  cmdH  seqL  seqH  byte  nL    nH    n2L                     crc   crc
         byte[] packet = new byte[] {(byte) 0xcc, (byte) 0x90, 0x00, 0x27, 0x50, 0x63, 0x00, (byte) 0xf0, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5b, (byte) 0xc5};
@@ -1341,7 +1346,7 @@ public class MainActivity extends AppCompatActivity {
         SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
         sendOneBytePacketWithoutReplay.execute(packet);
     }
-    public static void sendAckFileDone(int size)
+    public void sendAckFileDone(int size)
     {
         //                                          crc    typ  cmdL  cmdH  seqL  seqH  fidL  fidH  size  size  size  size  crc   crc
         byte[] packet = new byte[] {(byte) 0xcc, (byte) 0x88, 0x00, 0x24, 0x48, 0x64, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5b, (byte) 0xc5};
@@ -1403,7 +1408,7 @@ public class MainActivity extends AppCompatActivity {
                      String dataString= new String(packet.getData(), StandardCharsets.UTF_8);
                      if(dataString.startsWith("conn_ack")&&connected==false){
                          connected = true;
-                         setPicVidMode(1);
+                         setPicVidMode(0);
                          setEis(0);
                          controllerState.setSpeedMode(1);
                          setAttAngle(25.0f);
