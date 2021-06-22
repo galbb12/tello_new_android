@@ -95,13 +95,9 @@ public class BitConverter {
     }
 
     public static int toInt32(byte[] bytes, int index) throws Exception {
-        if (bytes.length != 2)
-            //throw new Exception(
-            //        "The length of the byte array must be at least 4 bytes long.");
-            bytes= Arrays.copyOfRange(bytes, index,index+2);
-        return (int) ((int) (0xff & bytes[0]) << 56
-                | (int) (0xff & bytes[0 + 1]) << 48
-                | (int) (0xff & bytes[0 + 2]) << 40 | (int) (0xff & bytes[0 + 3]) << 32);
+        if (bytes.length != 4){
+            bytes= Arrays.copyOfRange(bytes, index,index+4);}
+        return java.nio.ByteBuffer.wrap(bytes).getInt();
     }
 
     public static long toInt64(byte[] bytes, int index) throws Exception {
@@ -118,10 +114,11 @@ public class BitConverter {
     }
 
     public static float toSingle(byte[] bytes, int index) throws Exception {
-        if (bytes.length != 4)
-            throw new Exception(
-                    "The length of the byte array must be at least 4 bytes long.");
-        return Float.intBitsToFloat(toInt32(bytes, index));
+
+
+        if (bytes.length != 4){
+            bytes= Arrays.copyOfRange(bytes, index,index+4);}
+        return java.nio.ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getFloat();
     }
 
     public static String toString(byte[] bytes) throws Exception {

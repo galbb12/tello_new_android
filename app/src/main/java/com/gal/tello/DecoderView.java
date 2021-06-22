@@ -15,6 +15,7 @@ import android.media.MediaFormat;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Message;
 import android.provider.MediaStore;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -34,20 +35,26 @@ import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.LocalDateTime;
 
 public class DecoderView extends TextureView {
     byte[] buffer;
     private MediaCodec codec;
     private boolean bConfigured =false;
+    private boolean bWaitForKeyframe = true;
     //pic mode sps
     private byte[] sps = new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 60, (byte) 5, (byte) 185};
-    private boolean bWaitForKeyframe = true;
 
 
-    private byte[] pps = {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
+
+    private byte[] pps = new byte[] {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
     private int decoderWidth = 960;
     private int decoderHeight = 720;
     Context CONTEXT;
+    MainActivity mainActivity;
+    SurfaceTexture surfaceTexture;
+    Surface surface;
+    TextureView textureView;
 
 
     public DecoderView(Context context, AttributeSet attributeSet) {
@@ -65,7 +72,12 @@ public class DecoderView extends TextureView {
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public void Init() {
-        TextureView textureView=this;
+
+        if(surface == null){
+        textureView=this;
+        surfaceTexture = textureView.getSurfaceTexture();
+        surface= new Surface(surfaceTexture);}
+        try {
         if (sps.length == 14){
             decoderWidth = 1280;}
         else{
@@ -74,12 +86,23 @@ public class DecoderView extends TextureView {
         MediaFormat videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
         videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
         videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
+       // videoFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate/50);
+        videoFormat.setInteger(MediaFormat.KEY_BIT_RATE,mainActivity.bitrate);
+      //  videoFormat.setInteger(MediaFormat.KEY_PRIORITY,100);
+       // videoFormat.setFeatureEnabled(MediaFormat.KEY_TEMPORAL_LAYERING,true);
+      //  videoFormat.setFeatureEnabled(MediaFormat.KEY_COLOR_TRANSFER,true);
+        videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
+        videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
+            videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
+      //  videoFormat.setInteger(MediaFormat.KEY_FRAME_RATE,25);
+        videoFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
+
 
         String str = videoFormat.getString("mime");
-        try {
+        if(codec!=null){
+        codec.release();}
             MediaCodec cdx = MediaCodec.createDecoderByType(str);
-            SurfaceTexture surfaceTexture = textureView.getSurfaceTexture();
-            cdx.configure(videoFormat, new Surface(surfaceTexture), (MediaCrypto) null, 0);
+            cdx.configure(videoFormat, surface, (MediaCrypto) null, 0);
             cdx.start();
 
             codec = cdx;
@@ -88,8 +111,8 @@ public class DecoderView extends TextureView {
             //handle
           //bConfigured=false;
           // Init();
-            stop();
             ex.printStackTrace();
+            stop();
         }
         (MainActivity.activity).runOnUiThread(new Runnable() {
             public void run() {
@@ -115,12 +138,14 @@ public class DecoderView extends TextureView {
                 }
                 // Commit the layout parameters
                 textureView.setLayoutParams(lp);
+                textureView.invalidate();
                 Log.d("Configured", "Configured");
                 bConfigured = true;}});
 
         return;
 
     }
+
 
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
@@ -137,12 +162,15 @@ public class DecoderView extends TextureView {
             if (array.length != sps.length) {
                 stop();
                 sps = array;
-                Init();
+              // ((Runnable) () -> {
+              //     MainActivity mainActivity = new MainActivity();
+              //     mainActivity.requestIframe();
+              // }).run();
             }
             return;
         }
         if (nalType == 8) {
-            pps = array;
+           // pps = array;
             return;
         }
         if (bConfigured == false) {
@@ -152,11 +180,12 @@ public class DecoderView extends TextureView {
         //Make sure keyframe is first.
         if (nalType == 5) {
             bWaitForKeyframe = false;
+
             //pps = array.ToArray();
             //return;
         }
-        if (bWaitForKeyframe)
-            return;
+        if (bWaitForKeyframe){
+            return;}
 
         if (bConfigured) {
             try {
@@ -172,6 +201,7 @@ public class DecoderView extends TextureView {
 
                 //Show decoded frame
                 MediaCodec.BufferInfo BufferInfo = new MediaCodec.BufferInfo();
+                Log.d("tag", String.valueOf(BufferInfo.size));
                 int i = codec.dequeueOutputBuffer(BufferInfo, 0L);
                 while (i >= 0) {
                         /*if (picSurface == null)//Only if not using display surface.
@@ -207,6 +237,7 @@ public class DecoderView extends TextureView {
                   //      e.printStackTrace();
                   //  }
                 }
+
             } catch (Exception ex) {
                 ex.printStackTrace();
 
@@ -224,7 +255,7 @@ public class DecoderView extends TextureView {
 
 
     private void Initialize() {
-
+        mainActivity= new MainActivity();
     }
 
     public void stop() {
@@ -238,5 +269,7 @@ public class DecoderView extends TextureView {
             }
         }
         codec = null;
+        sps = new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 60, (byte) 5, (byte) 185};
+        pps = new byte[] {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
     }
 }

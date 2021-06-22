@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.PointF;
 import android.media.MediaCodec;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -27,6 +28,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 
+import com.google.common.primitives.UnsignedInteger;
+import com.google.errorprone.annotations.Var;
+
+import java.io.Console;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -39,8 +44,11 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
 import java.text.DecimalFormat;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -63,9 +71,6 @@ public class MainActivity extends AppCompatActivity {
     boolean[] picPieceState;
     File h264FilePath;
     File videoFilePath;
-    WifiManager wifiManager;
-    ConnectivityManager connManager;
-    NetworkInfo mWifi;
     VideoDatagramReceiver videoDatagramReceiver;
     StatusDatagramReceiver statusDatagramReceiver;
     connectionlistener connectionlistener;
@@ -78,6 +83,8 @@ public class MainActivity extends AppCompatActivity {
     boolean[] picChunkState;
     TextView textViewBattery;
     TextView textViewTemp;
+    TextView textViewRotation;
+    TextView textViewPosition;
     int picBytesRecived;
     int height;
     int northSpeed;
@@ -119,7 +126,6 @@ public class MainActivity extends AppCompatActivity {
     int wifiStrength;
     public boolean isPaused = false;
     private static int sequence = 1;
-    private MediaCodec m_codec;// Media decoder
     static DatagramSocket socketMainSending;
     static InetAddress inetAddressMainSending;
     public static final int portMainSending = 8889;
@@ -128,16 +134,28 @@ public class MainActivity extends AppCompatActivity {
     DatagramSocket socketStatusServer;
     DatagramSocket socketStreamOnServer;
     static Activity activity;
-    int speed = 1;
+    int bitrate = 3;
     static ControllerState controllerState;
+    static ControllerState AutoPilotControllerState;
     static JoystickView joystickr;
     static JoystickView joystickl;
-    int iFrameRate = 6;
+    int iFrameRate = 5;
+    Float posX=0.0f;
+    Float posY=0.0f;
+    Float posZ=0.0f;
+    Float posUncertainty=0.0f;
+    double[] eular;
     HeartBeatStreamon heartBeatStreamon;
     HeartBeatJoystick heartBeatJoystick;
     BitConverter bitConverter;
     Boolean record=false;
     FileOutputStream fos;
+    boolean bHomePointSet=true;
+    boolean bAutopilot=false;
+    boolean bLookAtTargetSet =false;
+    boolean bLookAt=false;
+    PointF lookAtTarget= new PointF(0.0f,0.0f);
+    PointF autopilotTarget= new PointF(0.0f,0.0f);
 
 
     @Override
@@ -158,10 +176,10 @@ public class MainActivity extends AppCompatActivity {
         takepicture = findViewById(R.id.takepicture);
         textViewBattery = findViewById(R.id.textViewbattery);
         textViewTemp = findViewById(R.id.textViewTemp);
+        textViewRotation = findViewById(R.id.textViewRotation);
+        textViewPosition = findViewById(R.id.textViewPosition);
         controllerState = new ControllerState();
-        wifiManager = (WifiManager) getApplication().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        connManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+        AutoPilotControllerState = new ControllerState();
         BroadcastReceiver broadcastReceiver = new WifiBroadcastReceiver();
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(WifiManager.SUPPLICANT_STATE_CHANGED_ACTION);
@@ -305,17 +323,137 @@ public class MainActivity extends AppCompatActivity {
                         | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_FULLSCREEN);
     }
+    public void setLookAtTarget(PointF target)
+    {
+        if (flying)
+        {
+            lookAtTarget = target;
+        }
+    }
+    public void setAutopilotTarget(PointF target)
+    {
+        if (flying)
+        {
+            lookAtTarget = target;
+        }
+    }
+    public void cancelAutopilot()
+    {
+        if(bAutopilot)
+        AutoPilotControllerState.setAxis(0, 0, 0, 0);
+        sendControllerUpdate();
+        bAutopilot = false;
+
+    }
+    private void handleAutopilot()
+    {
+
+        if (!bHomePointSet)
+        {
+            if(posUncertainty>0.03)
+            {
+                //set new home point
+                setAutopilotTarget(new PointF(posX, posY));
+                bHomePointSet = true;
+            }
+        }
+
+        if (!bLookAtTargetSet)
+        {
+            if(posUncertainty>0.03)
+            {
+                //set new home point
+                setLookAtTarget(new PointF(posX, posY));
+                bLookAtTargetSet = true;
+            }
+        }
+
+        double lx = 0, ly = 0, rx = 0, ry = 0;
+        boolean updated = false;
+        if (bLookAt && bLookAtTargetSet)
+        {
+            float yaw = (float) eular[2];
+
+            float deltaPosX = lookAtTarget.x - posX;
+            float deltaPosY = lookAtTarget.y - posY;
+            float dist = (float) Math.sqrt(deltaPosX * deltaPosX + deltaPosY * deltaPosY);
+            float normalizedX = deltaPosX / dist;
+            float normalizedY = deltaPosY / dist;
+
+            float targetYaw = (float) Math.atan2(normalizedY, normalizedX);
+
+            double deltaYaw = 0.0;
+            if (Math.abs(targetYaw - yaw) < Math.PI)
+                deltaYaw = targetYaw - yaw;
+            else if (targetYaw > yaw)
+                deltaYaw = targetYaw - yaw - Math.PI * 2.0f;
+            else
+                deltaYaw = targetYaw - yaw + Math.PI * 2.0f;
+
+
+            float minYaw = 0.1f;//Radians
+            if (Math.abs(deltaYaw) > minYaw)
+            {
+                lx = Math.min(1.0, deltaYaw * 1.0);
+                updated = true;
+            }
+            else if (deltaYaw < -minYaw)
+            {
+                lx = -Math.min(1.0, deltaYaw * 1.0);
+                updated = true;
+            }
+        }
+        if (bAutopilot && bHomePointSet)
+        {
+            double yaw = eular[2];
+
+            Float deltaPosX = autopilotTarget.x - posX;
+            Float deltaPosY = autopilotTarget.y- posY;
+            Float dist = Float.valueOf((float) Math.sqrt(deltaPosX * deltaPosX + deltaPosY * deltaPosY));
+            Float normalizedX = deltaPosX / dist;
+            Float normalizedY = deltaPosY / dist;
+
+            Float targetYaw = (float) Math.atan2(normalizedY, normalizedX);
+            Float deltaYaw = (Float.valueOf((float) (targetYaw - yaw)));
+
+            Float minDist = 0.25f;//Meters (I think)
+
+            if (dist > minDist)
+            {
+                Float speed = Math.min(0.45f, dist*2);//0.2 limits max throttle for safety.
+                rx = speed * Math.sin(deltaYaw);
+                ry = speed * Math.cos(deltaYaw);
+                updated = true;
+            }
+            else
+            {
+                cancelAutopilot();//arrived
+                updated = true;
+            }
+        }
+        if (updated)
+        {
+           AutoPilotControllerState.setAxis((float)lx, (float)ly, (float)rx, (float)ry);
+            sendControllerUpdate();
+        }
+    }
 
     void StartDroneConnection() {
         startStatus();
         try {
-            if (connectionlistener.isAlive()) {
-             connectionlistener.kill();
+            if (!connectionlistener.isAlive()) {
+                connectionlistener.start();
+            }else{
+                connectionlistener.kill();
+                connectionlistener = new connectionlistener();
+                connectionlistener.start();
             }
-            connectionlistener.start();
 
         } catch ( RuntimeException e) {
             e.printStackTrace();
+            connectionlistener.kill();
+            connectionlistener = new connectionlistener();
+            connectionlistener.start();
         }
 
 
@@ -331,7 +469,7 @@ public class MainActivity extends AppCompatActivity {
             connected = false;
             StartDroneConnection();
             DecoderView decoderView = findViewById(R.id.decoderView);
-            decoderView.stop(); }
+            decoderView.stop();}
 
         }
 
@@ -359,10 +497,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     class connectionlistener extends Thread {
-
         Boolean BKeepRunning = true;
         @Override
         public void run() {
+            BKeepRunning = true;
+            WifiManager  wifiManager = (WifiManager) getApplication().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            ConnectivityManager connManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
             Log.d("connecting", "connecting to tello");
             while (!connected&&BKeepRunning) {
                 try {
@@ -409,7 +550,7 @@ public class MainActivity extends AppCompatActivity {
         float ry = Float.parseFloat(df.format(Math.abs(r[1]) < deadBand ? 0.0f : r[1]));//(((float)joystickr.getNormalizedY()-50.0f)/50);
         float lx = Float.parseFloat(df.format(Math.abs(l[0]) < deadBand ? 0.0f : l[0]));//(((float)joystickl.getNormalizedX()-50.0f)/50);
         float ly = Float.parseFloat(df.format(Math.abs(l[1]) < deadBand ? 0.0f : l[1]));//(((float)joystickl.getNormalizedY()-50.0f)/50);
-         Log.d("joystick", "rx: " + rx + " " + "ry: " + ry + " " + "lx: " + lx + " " + "ly: " + ly+" " + "ly: " + ly);
+         //Log.d("joystick", "rx: " + rx + " " + "ry: " + ry + " " + "lx: " + lx + " " + "ly: " + ly+" " + "ly: " + ly);
         controllerState.setAxis(lx, -ly, rx, -ry);
         sendControllerUpdate();
     }
@@ -640,6 +781,8 @@ public class MainActivity extends AppCompatActivity {
 
         SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
         sendOneBytePacketWithoutReplay.execute(packet);
+       // DecoderView decoderView = findViewById(R.id.decoderView);
+       // decoderView.stop();
 
     }
 
@@ -670,6 +813,9 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public Void doInBackground(byte[]... bytes) {
+            WifiManager  wifiManager = (WifiManager) getApplication().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            ConnectivityManager connManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
             if (mWifi.isConnected()) {
                 String ip = Formatter.formatIpAddress(wifiManager.getConnectionInfo().getIpAddress());
                 if (ip.startsWith("192.168.10.")) {
@@ -809,7 +955,7 @@ public class MainActivity extends AppCompatActivity {
 
         float boost = 0.0f;
         if (controllerState.speed > 0)
-            boost = 2.0f;
+            boost = 1.0f;
 
         //var limit = 1.0f;//Slow down while testing.
         //rx = rx * limit;
@@ -972,6 +1118,7 @@ public class MainActivity extends AppCompatActivity {
         public byte[] lmessage = new byte[5840];
         byte[] videoFrame = new byte[100 * 1024];
         int videoOffset = 0;
+        Boolean started =false;
 
         @RequiresApi(api = Build.VERSION_CODES.O)
         @Override
@@ -996,7 +1143,16 @@ public class MainActivity extends AppCompatActivity {
 
                     }
                     byte[] data = new byte[packet.getLength()];
+                    //Log.d("Video Length", String.valueOf(data.length));
                     System.arraycopy(packet.getData(), 0, data, 0, packet.getLength());
+                    if (data[2] == 0 && data[3] == 0 && data[4] == 0 && data[5] == 1&&!started)//Wait for first NAL
+                    {
+                        int nal = (data[6] & 0x1f);
+                        //if (nal != 0x01 && nal!=0x07 && nal != 0x08 && nal != 0x05)
+                        //    Console.WriteLine("NAL type:" +nal);
+                        started = true;
+                    }
+                    if(started)
                     if (record) {
                         if(h264FilePath!=null){
                         if(fos==null){
@@ -1009,28 +1165,36 @@ public class MainActivity extends AppCompatActivity {
                         }}}
 
 
+
+
                     try {
                         if (data[2] == 0 && data[3] == 0 && data[4] == 0 && data[5] == 1) {
 
-
+                            int nalType = data[6] & 0x1f;
+                           // Log.d("videoOffset", String.valueOf(videoOffset));
                             if (videoOffset > 0) {
                                 if (!isPaused) {
                                     videoFramenew = new byte[videoOffset];
                                     System.arraycopy(videoFrame, 0, videoFramenew, 0, videoOffset);
-                                    imageView.decode(videoFramenew);
+                                    Log.d("videoFrame", String.valueOf(videoFramenew.length));
+                                    //if(videoFramenew.length>20){imageView.decode(videoFramenew); }
+                                    //else {requestIframe();}
+                                    //if(videoFramenew.length<20){requestIframe();}
+                                    try {
+                                    imageView.decode(videoFramenew);}catch (Exception e){imageView.stop();}
                                     videoOffset = 0;
-                                    videoFrame = new byte[100 * 1024];
+                                    videoFrame = new byte[100 * 1024];}
                                 }
-                            }
+                            }else{
                         }
                         try {
                             System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                             videoOffset += (data.length - 2);
                         }catch (Exception e){
-                             videoFrame = new byte[100 * 1024];
-
-                             videoOffset = 0;
+                            videoFrame = new byte[100 * 1024];
+                            videoOffset = 0;
                         }
+
 
 
 
@@ -1180,132 +1344,183 @@ public class MainActivity extends AppCompatActivity {
         return ByteBuffer.wrap(slice).getFloat();
     }
 
-    public void set(byte[] data) {
-        try {
+    public void set(byte[] data)
+    {
+        int index = 0;
+        height = (short)(data[index] | (data[index + 1] << 8)); index += 2;
+        northSpeed = (short)(data[index] | (data[index + 1] << 8)); index += 2;
+        eastSpeed = (short)(data[index] | (data[index + 1] << 8)); index += 2;
+        flySpeed = ((int)Math.sqrt(Math.pow(northSpeed, 2.0D) + Math.pow(eastSpeed, 2.0D)));
+        verticalSpeed = (int) (data[index] | (data[index + 1] << 8)); index += 2;// ah.a(paramArrayOfByte[6], paramArrayOfByte[7]);
+        flyTime = data[index] | (data[index + 1] << 8); index += 2;// ah.a(paramArrayOfByte[8], paramArrayOfByte[9]);
 
-            int index = 0;
-            height = (int) (data[index] | (data[index + 1] << 8));
-            index += 2;
-            northSpeed = (int) (data[index] | (data[index + 1] << 8));
-            index += 2;
-            eastSpeed = (int) (data[index] | (data[index + 1] << 8));
-            index += 2;
-            flySpeed = ((int) Math.sqrt(Math.pow(northSpeed, 2.0D) + Math.pow(eastSpeed, 2.0D)));
-            verticalSpeed = (int) (data[index] | (data[index + 1] << 8));
-            index += 2;// ah.a(paramArrayOfByte[6], paramArrayOfByte[7]);
-            flyTime = data[index] | (data[index + 1] << 8);
-            index += 2;// ah.a(paramArrayOfByte[8], paramArrayOfByte[9]);
+        imuState = (data[index] >> 0 & 0x1) == 1 ? true : false;
+        pressureState = (data[index] >> 1 & 0x1) == 1 ? true : false;
+        downVisualState = (data[index] >> 2 & 0x1) == 1 ? true : false;
+        powerState = (data[index] >> 3 & 0x1) == 1 ? true : false;
+        batteryState = (data[index] >> 4 & 0x1) == 1 ? true : false;
+        gravityState = (data[index] >> 5 & 0x1) == 1 ? true : false;
+        windState = (data[index] >> 7 & 0x1) == 1 ? true : false;
+        index += 1;
 
-            imuState = (data[index] >> 0 & 0x1) == 1 ? true : false;
-            pressureState = (data[index] >> 1 & 0x1) == 1 ? true : false;
-            downVisualState = (data[index] >> 2 & 0x1) == 1 ? true : false;
-            powerState = (data[index] >> 3 & 0x1) == 1 ? true : false;
-            batteryState = (data[index] >> 4 & 0x1) == 1 ? true : false;
-            gravityState = (data[index] >> 5 & 0x1) == 1 ? true : false;
-            windState = (data[index] >> 7 & 0x1) == 1 ? true : false;
-            index += 1;
+        //if (paramArrayOfByte.length < 19) { }
+        imuCalibrationState = data[index]; index += 1;
+        batteryPercentage = data[index]; index += 1;
+        textViewBattery.setText("battery:"+ String.valueOf(batteryPercentage));
+        droneFlyTimeLeft = data[index] | (data[index + 1] << 8); index += 2;
+        droneBatteryLeft = data[index] | (data[index + 1] << 8); index += 2;
 
-            //if (paramArrayOfByte.length < 19) { }
-            imuCalibrationState = data[index];
-            index += 1;
-            batteryPercentage = data[index];
-            index += 1;
-            Log.d("batteryPercentage", String.valueOf(batteryPercentage));
-            textViewBattery.setText("Battery:" + String.valueOf(batteryPercentage));
-            droneFlyTimeLeft = data[index] | (data[index + 1] << 8);
-            index += 2;
-            droneBatteryLeft = data[index] | (data[index + 1] << 8);
-            index += 2;
-            //index 17
-            flying = (data[index] >> 0 & 0x1) == 1 ? true : false;
-            onGround = (data[index] >> 1 & 0x1) == 1 ? true : false;
-            eMOpen = (data[index] >> 2 & 0x1) == 1 ? true : false;
-            droneHover = (data[index] >> 3 & 0x1) == 1 ? true : false;
-            outageRecording = (data[index] >> 4 & 0x1) == 1 ? true : false;
-            batteryLow = (data[index] >> 5 & 0x1) == 1 ? true : false;
-            batteryLower = (data[index] >> 6 & 0x1) == 1 ? true : false;
-            factoryMode = (data[index] >> 7 & 0x1) == 1 ? true : false;
-            index +=
-                    flyMode = data[index];
-            index += 1;
-            throwFlyTimer = data[index];
-            index += 1;
-            cameraState = data[index];
-            index += 1;
+        //index 17
+        flying = (data[index] >> 0 & 0x1)==1?true:false;
+        onGround = (data[index] >> 1 & 0x1) == 1 ? true : false;
+        eMOpen = (data[index] >> 2 & 0x1) == 1 ? true : false;
+        droneHover = (data[index] >> 3 & 0x1) == 1 ? true : false;
+        outageRecording = (data[index] >> 4 & 0x1) == 1 ? true : false;
+        batteryLow = (data[index] >> 5 & 0x1) == 1 ? true : false;
+        batteryLower = (data[index] >> 6 & 0x1) == 1 ? true : false;
+        factoryMode = (data[index] >> 7 & 0x1) == 1 ? true : false;
+        index += 1;
 
-            //if (paramArrayOfByte.length >= 22)
-            electricalMachineryState = data[index];
-            index += 1; //(paramArrayOfByte[21] & 0xFF);
+        flyMode = data[index]; index += 1;
+        throwFlyTimer = data[index]; index += 1;
+        cameraState = data[index]; index += 1;
 
-            //if (paramArrayOfByte.length >= 23)
-            frontIn = (data[index] >> 0 & 0x1) == 1 ? true : false;//22
-            frontOut = (data[index] >> 1 & 0x1) == 1 ? true : false;
-            frontLSC = (data[index] >> 2 & 0x1) == 1 ? true : false;
-            index += 1;
-            temperatureHeight = (data[index] >> 0 & 0x1);//23
-            textViewTemp.setText(temperatureHeight);
+        //if (paramArrayOfByte.length >= 22)
+        electricalMachineryState = data[index]; index += 1; //(paramArrayOfByte[21] & 0xFF);
 
-            wifiStrength = 0;//Wifi str comes in a cmd.
-        } catch (RuntimeException e) {
+        //if (paramArrayOfByte.length >= 23)
+        frontIn = (data[index] >> 0 & 0x1) == 1 ? true : false;//22
+        frontOut = (data[index] >> 1 & 0x1) == 1 ? true : false;
+        frontLSC = (data[index] >> 2 & 0x1) == 1 ? true : false;
+        index += 1;
+        temperatureHeight = (int)(data[index] >> 0 & 0x1);//23
+        textViewTemp.setText("temp: "+ String.valueOf(temperatureHeight));
+    }
+
+    public double[] toEuler(float quatX,float quatY,float quatZ,float quatW)
+    {
+        float qX = quatX;
+        float qY = quatY;
+        float qZ = quatZ;
+        float qW = quatW;
+
+        double sqW = qW * qW;
+        double sqX = qX * qX;
+        double sqY = qY * qY;
+        double sqZ = qZ * qZ;
+        double yaw;
+        double roll;
+        double pitch;
+        double[] retv = new double[3];
+        double unit = sqX + sqY + sqZ + sqW; // if normalised is one, otherwise
+        // is correction factor
+        double test = qW * qX + qY * qZ;
+        Log.d("test", String.valueOf(test));
+        if (test > 0.499 * unit)
+        { // singularity at north pole
+            yaw = 2 * Math.atan2(qY, qW);
+            pitch = Math.PI / 2;
+            roll = 0;
         }
+        else if (test < -0.499 * unit)
+        { // singularity at south pole
+            yaw = -2 * Math.atan2(qY, qW);
+            pitch = -Math.PI / 2;
+            roll = 0;
+        }
+        else
+        {
+            yaw = Math.atan2(2.0 * (qW * qZ - qX * qY),
+                    1.0 - 2.0 * (sqZ + sqX));
+            roll = Math.asin(2.0 * test / unit);
+            pitch = Math.atan2(2.0 * (qW * qY - qX * qZ),
+                    1.0 - 2.0 * (sqY + sqX));
+        }
+        retv[0] = pitch;
+        retv[1] = roll;
+        retv[2] = yaw;
+        return retv;
     }
 
     //Parse some of the interesting info from the tello log stream
-   /* public void parseLog(byte[] data)
-    {
+    public void parseLog(byte[] data) throws Exception {
         int pos = 0;
 
         //A packet can contain more than one record.
         while (pos < data.length-2)//-2 for CRC bytes at end of packet.
         {
-            if (data[pos] != 'U')//Check magic byte
+
+            if (data[pos] != 85)//Check magic byte
             {
                 //Console.WriteLine("PARSE ERROR!!!");
                 break;
-            }
-            int len = data[pos + 1];
+             }
+            //Log.d("magic byte", String.valueOf(data[pos]));
             if (data[pos + 2] != 0)//Should always be zero (so far)
             {
                 //Console.WriteLine("SIZE OVERFLOW!!!");
                 break;
             }
+            byte len = (byte) Math.abs(data[pos + 1]);
+            Log.d("len", String.valueOf(len));
             int crc = data[pos + 3];
-            int id = BitConverter.toInt16(data, pos + 4);
+            int id = BitConverter.toUint16(data, pos + 4);
             byte[] xorBuf = new byte[256];
             byte xorValue = data[pos + 6];
-            switch (id)
-            {
+            switch (id) {
                 case 0x1d://29 new_mvo
-                    for (int i = 0; i < len; i++)//Decrypt payload.
-                        xorBuf[i] = (byte)(data[pos + i] ^ xorValue);
+                    for (int i = 0; i < len; i++) {//Decrypt payload.
+                        xorBuf[i] = (byte) (data[pos + i] ^ xorValue);
+                    }
                     int index = 10;//start of the velocity and pos data.
-                    int observationCount = BitConverter.toInt16(xorBuf, index); index += 2;
-                    int velX           = BitConverter.toInt16(xorBuf, index); index += 2;
-                    int velY           = BitConverter.toInt16(xorBuf, index); index += 2;
-                    int velZ           = BitConverter.toInt16(xorBuf, index); index += 2;
-                    float posX           = ByteArrayToSingle(xorBuf, index); index += 4;
-                    float posY           = ByteArrayToSingle(xorBuf, index); index += 4;
-                    float posZ           = ByteArrayToSingle(xorBuf, index); index += 4;
-                    float posUncertainty = ByteArrayToSingle(xorBuf, index)*10000.0f; index += 4;
-                    //Console.WriteLine(observationCount + " " + posX + " " + posY + " " + posZ);
+                    int observationCount = BitConverter.toUint16(xorBuf, index);
+                    index += 2;
+                    int velX = BitConverter.toUint16(xorBuf, index);
+                    index += 2;
+                    int velY = BitConverter.toUint16(xorBuf, index);
+                    index += 2;
+                    int velZ = BitConverter.toUint16(xorBuf, index);
+                    index += 2;
+                    posX = BitConverter.toSingle(xorBuf, index);
+                    index += 4;
+                    posY = BitConverter.toSingle(xorBuf, index);
+                    index += 4;
+                    posZ = -BitConverter.toSingle(xorBuf, index);
+                    index += 4;
+                    posUncertainty = BitConverter.toSingle(xorBuf, index) * 10000.0f;
+                    index += 4;
+                    Log.d("pos", observationCount + " " + posX + " " + posY + " " + posZ);
+                    Log.d("vel", observationCount + " " + velX + " " + velY + " " + velZ);
+                    textViewPosition.setText(" x:" + posX + " y:" + posY + " z:" + posZ);
                     break;
                 case 0x0800://2048 imu
-                    for (int i = 0; i < len; i++)//Decrypt payload.
-                        xorBuf[i] = (byte)(data[pos + i] ^ xorValue);
+                    for (int i = 0; i < len; i++) {//Decrypt payload.
+                        xorBuf[i] = (byte) (data[pos + i] ^ xorValue);
+                    }
                     int index2 = 10 + 48;//44 is the start of the quat data.
-                    float quatW = ByteArrayToSingle(xorBuf, index2); index2 += 4;
-                    float quatX = ByteArrayToSingle(xorBuf, index2); index2 += 4;
-                    float quatY = ByteArrayToSingle(xorBuf, index2); index2 += 4;
-                    float quatZ = ByteArrayToSingle(xorBuf, index2); index2 += 4;
-                    //Console.WriteLine("qx:" + qX + " qy:" + qY+ "qz:" + qZ);
+                    float quatW = BitConverter.toSingle(xorBuf, index2);
+                    index2 += 4;
+                    float quatX = BitConverter.toSingle(xorBuf, index2);
+                    index2 += 4;
+                    float quatY = BitConverter.toSingle(xorBuf, index2);
+                    index2 += 4;
+                    float quatZ = BitConverter.toSingle(xorBuf, index2);
+                    index2 += 4;
 
-                    //var eular = toEuler(quatX, quatY, quatZ, quatW);
-                    //Console.WriteLine(" Pitch:"+eular[0] * (180 / 3.141592) + " Roll:" + eular[1] * (180 / 3.141592) + " Yaw:" + eular[2] * (180 / 3.141592));
 
+                    eular = toEuler(quatX, quatY, quatZ, quatW);
+                    Log.d("eular", " Pitch:" + eular[0] * (180 / 3.141592) + " Roll:" + eular[1] * (180 / 3.141592) + " Yaw:" + eular[2] * (180 / 3.141592));
+                    textViewRotation.setText(" Pitch:" + eular[0] * (180 / 3.141592) + " Roll:" + eular[1] * (180 / 3.141592) + " Yaw:" + eular[2] * (180 / 3.141592));
+                   // Log.d("eular", "quatW:" + quatW + " quatX:" + quatX + " quatY:" + quatY + " quatZ:" + quatZ);
                     index2 = 10 + 76;//Start of relative velocity
-                    float velN = ByteArrayToSingle(xorBuf, index2); index2 += 4;
-                    float velE = ByteArrayToSingle(xorBuf, index2); index2 += 4;
-                    float velD = ByteArrayToSingle(xorBuf, index2); index2 += 4;
+                    float velN = BitConverter.toSingle(xorBuf, index2);
+                    index2 += 4;
+                    float velE = BitConverter.toSingle(xorBuf, index2);
+                    index2 += 4;
+                    float velD = BitConverter.toSingle(xorBuf, index2);
+                    index2 += 4;
+
+
                     //Console.WriteLine(vN + " " + vE + " " + vD);
 
                     break;
@@ -1313,7 +1528,7 @@ public class MainActivity extends AppCompatActivity {
             }
             pos += len;
         }
-    }*/
+    }
     public void sendAckFilePiece(byte endFlag,int fileId, int pieceId)
     {
         //                                          crc    typ  cmdL  cmdH  seqL  seqH  byte  nL    nH    n2L                     crc   crc
@@ -1369,13 +1584,13 @@ public class MainActivity extends AppCompatActivity {
         //                                          crc    typ  cmdL  cmdH  seqL  seqH  unk   idL   idH   crc   crc
         byte[] packet = new byte[] {(byte) 0xcc, 0x70, 0x00, 0x27, 0x50, 0x50, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5b, (byte) 0xc5};
 
-        byte[] ba = ShortToByteaArray(cmd);
-        packet[5] = ba[0];
-        packet[6] = ba[1];
+        packet[5] = (byte)(cmd & 0xff);
+        packet[6] = (byte)((cmd >> 8) & 0xff);
 
-        ba = ShortToByteaArray(id);
-        packet[10] = ba[0];
-        packet[11] = ba[1];
+
+        packet[10] = (byte)(id & 0xff);
+        packet[11] = (byte)((id >> 8) & 0xff);
+
 
         setPacketSequence(packet);
         setPacketCRCs(packet);
@@ -1391,6 +1606,10 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void run() {
 
+            try {
+                socketMainSending.setSoTimeout(1000);
+            } catch (SocketException e) {
+            }
             byte[] lmessage = new byte[2048];
             DatagramPacket packet = new DatagramPacket(lmessage, lmessage.length);
 
@@ -1400,24 +1619,25 @@ public class MainActivity extends AppCompatActivity {
                     if(socketMainSending!=null){
                         try {
                     socketMainSending.receive(packet);
-                    socketMainSending.setSoTimeout(1000);
                     byte[] recived = new byte[packet.getLength()];
                     System.arraycopy(packet.getData(), 0, recived, 0, packet.getLength());
                     int cmdId = ((int) recived[5] | ((int) recived[6] << 8));
                     Log.d("Cmd id", String.valueOf(cmdId));
                      String dataString= new String(packet.getData(), StandardCharsets.UTF_8);
                      if(dataString.startsWith("conn_ack")&&connected==false){
-                         connected = true;
-                         setPicVidMode(0);
+                         streamon();
                          setEis(0);
+                         setPicVidMode(0);
+                         requestIframe();
                          controllerState.setSpeedMode(1);
                          setAttAngle(25.0f);
                          StartHeartBeatJoystick();
                          activity = (Activity) MainActivity.this;
-                         setVideoBitRate(3);
+                         setVideoBitRate(bitrate);
                          setBatteryLowLevel(10);
                          setAttitude(30);
-                         streamon();
+                         connected = true;
+
                      }
                     if (cmdId >= 74 && cmdId < 80) {
                         //Console.WriteLine("XXXXXXXXCMD:" + cmdId);
@@ -1431,16 +1651,17 @@ public class MainActivity extends AppCompatActivity {
                     if (cmdId == 4176)//log header
                     {
                         //just ack.
-                        //int id = BitConverter.toInt16(recived, 9);
-                        //sendAckLog((short)cmdId, id);
-                        //Console.WriteLine(id);
+                        int id =  BitConverter.toUint16(recived, 9);
+                        sendAckLog((short) cmdId,  (short) id);
+                        Log.d("id", String.valueOf(id));
                     }
                     if (cmdId == 4177)//log data
                     {
                         try {
-                            //state.parseLog(received.bytes.Skip(10).ToArray());
+                           parseLog(Arrays.copyOfRange(recived, 10,recived.length));
                         } catch (Exception pex) {
                             // Console.WriteLine("parseLog error:" + pex.Message);
+                            pex.printStackTrace();
                         }
                     }
                     if (cmdId == 4178)//log config
@@ -1459,7 +1680,7 @@ public class MainActivity extends AppCompatActivity {
                     if (cmdId == 4185)//att angle response
                     {
                         byte[] array = Arrays.copyOfRange(recived,10,14);
-                        float f = ByteArrayToSingle(array, 0);
+                        float f = BitConverter.toSingle(array, 0);
                         Log.d("att angle response", String.valueOf(f));
                     }
                     if (cmdId == 4182)//max hei response
@@ -1596,7 +1817,7 @@ public class MainActivity extends AppCompatActivity {
                     }
 
 
-                }catch (Exception e){}}}
+                }catch (Exception e){e.printStackTrace();}}}
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -1606,6 +1827,7 @@ public class MainActivity extends AppCompatActivity {
             if (socketMainSending == null) {
                 socketMainSending.close();
             }
+            handleAutopilot();
         }
 
         public void kill() {
