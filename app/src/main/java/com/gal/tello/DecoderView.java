@@ -111,7 +111,7 @@ public class DecoderView extends TextureView {
             ex.printStackTrace();
             stop();
         }
-        (MainActivity.activity).runOnUiThread(new Runnable() {
+        (mainActivity).runOnUiThread(new Runnable() {
             public void run() {
                 //Code goes here
                 int videoWidth = decoderWidth;

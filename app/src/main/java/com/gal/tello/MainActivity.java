@@ -160,6 +160,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        getSupportActionBar().hide();
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -276,6 +277,13 @@ public class MainActivity extends AppCompatActivity {
         //    }
         //});
         StartDroneConnection();
+        returntohome.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                bAutopilot = true;
+
+            }
+        });
         takepicture.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -486,7 +494,7 @@ public class MainActivity extends AppCompatActivity {
             Float targetYaw = (float) Math.atan2(normalizedY, normalizedX);
             Float deltaYaw = (Float.valueOf((float) (targetYaw - yaw)));
 
-            Float minDist = 0.25f;//Meters (I think)
+            Float minDist = 0.5f;//Meters (I think)
 
             if (dist > minDist)
             {
@@ -987,6 +995,8 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
         }
     }
+
+
     void takePicture()
     {
         //                                          crc    typ  cmdL  cmdH  seqL  seqH  crc   crc
@@ -1027,10 +1037,10 @@ public class MainActivity extends AppCompatActivity {
         //var limit = 1.0f;//Slow down while testing.
         //rx = rx * limit;
         //ry = ry * limit;
-        float rx = controllerState.rx;
-        float ry = controllerState.ry;
-        float lx = controllerState.lx;
-        float ly = controllerState.ly;
+        float rx = Clamp(controllerState.rx + AutoPilotControllerState.rx, -1.0f, 1.0f);
+        float ry = Clamp(controllerState.ry + AutoPilotControllerState.ry, -1.0f, 1.0f);
+        float lx = Clamp(controllerState.lx + AutoPilotControllerState.lx, -1.0f, 1.0f);
+        float ly = Clamp(controllerState.ly + AutoPilotControllerState.ly, -1.0f, 1.0f);
         // if (true)//Combine autopilot sticks.
         // {
         //     rx = Clamp(rx + autoPilotControllerState.rx, -1.0f, 1.0f);
@@ -1873,6 +1883,7 @@ public class MainActivity extends AppCompatActivity {
                     if (cmdId == 100) {
 
                     }
+                            handleAutopilot();
 
                     //send command to listeners.
                     try {
@@ -1895,7 +1906,6 @@ public class MainActivity extends AppCompatActivity {
             if (socketMainSending == null) {
                 socketMainSending.close();
             }
-            handleAutopilot();
         }
 
         public void kill() {

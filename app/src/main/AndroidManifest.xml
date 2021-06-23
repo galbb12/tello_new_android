@@ -10,7 +10,7 @@
         android:supportsRtl="true"
         android:largeHeap="true"
         android:configChanges="orientation|screenSize"
-        android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
+        android:theme="@style/Theme.Tellorewrite">
         <activity android:name=".MainActivity"
             android:configChanges="orientation"
             android:screenOrientation="landscape">
