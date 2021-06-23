@@ -86,13 +86,15 @@ public class DecoderView extends TextureView {
         MediaFormat videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
         videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
         videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
-       // videoFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate/50);
-        videoFormat.setFloat(MediaFormat.KEY_BIT_RATE,  1.5f);
+        videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate);
+        videoFormat.setInteger(MediaFormat.KEY_BIT_RATE,  1500000);
         videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
         videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
             videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
        videoFormat.setFeatureEnabled(videoFormat.KEY_HDR_STATIC_INFO,false);
-        videoFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
+            videoFormat.setFeatureEnabled(videoFormat.KEY_TEMPORAL_LAYERING,true);
+            videoFormat.setFeatureEnabled(videoFormat.KEY_COLOR_TRANSFER,true);
+     //   videoFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
 
 
         String str = videoFormat.getString("mime");
@@ -153,7 +155,7 @@ public class DecoderView extends TextureView {
         }
 
         int nalType = array[4] & 0x1f;
-//Console.WriteLine("nal:" + nalType);
+Log.d("nal", String.valueOf(nalType));
         if (nalType == 7) {
             //sps = array.ToArray();
             if (array != sps) {
@@ -162,6 +164,11 @@ public class DecoderView extends TextureView {
               //     MainActivity mainActivity = new MainActivity();
               //     mainActivity.requestIframe();
               // }).run();
+                //bConfigured=false;
+
+                if(array.length!=sps.length){
+                    stop();
+                }
             }
             return;
         }
@@ -186,6 +193,14 @@ public class DecoderView extends TextureView {
             return;}
 
         if (bConfigured) {
+           if(array.length<3000){//checks if the video frame isn't corrupt
+               if(nalType==5){
+                   mainActivity.requestIframe();
+            //       bWaitForKeyframe=true;
+               }
+               return;
+
+           }
             try {
                 int dequeueInputBuffer = codec.dequeueInputBuffer(-1L);
                 ByteBuffer inputBuffer = codec.getInputBuffer(dequeueInputBuffer);
@@ -246,8 +261,8 @@ public class DecoderView extends TextureView {
 
 
                 stop();
-            }
-        }else{stop();}
+            }}
+        else{stop();}
     }
 
 

@@ -16,7 +16,10 @@ import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.StrictMode;
 import android.text.format.Formatter;
 import android.util.Log;
@@ -45,6 +48,8 @@ import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.ExecutionException;
 
 
@@ -136,7 +141,7 @@ public class MainActivity extends AppCompatActivity {
     View joystickviewlocatorL;
     View joystickviewlocatorR;
 
-    int iFrameRate = 5;
+    float iFrameRate = 0.5f;
     Float posX=0.0f;
     Float posY=0.0f;
     Float posZ=0.0f;
@@ -1259,8 +1264,7 @@ public class MainActivity extends AppCompatActivity {
                                     //if(videoFramenew.length<20){requestIframe();}
                                     try {
                                     decoderView.decode(videoFramenew);}catch (Exception e){decoderView.stop();}
-                                    videoOffset = 0;
-                                    videoFrame = new byte[100 * 1024];}
+                                    videoOffset = 0; }
                                 }
                             }else{
                         }
@@ -1299,30 +1303,24 @@ public class MainActivity extends AppCompatActivity {
 
         boolean bKeepRunning = true;
 
+        Timer t;
         @RequiresApi(api = Build.VERSION_CODES.O)
         @Override
         public void run() {
-            int tick = 0;
 
-            while (bKeepRunning) {
-                tick++;
-                if ((tick % iFrameRate) == 0) {
+            t = new Timer();
+            t.schedule(new TimerTask() {
+                @Override
+                public void run() {
                     requestIframe();
                 }
-                try {
-                    Thread.sleep(50);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-
-            }
+            }, 0, (long) (iFrameRate*1000));
 
 
         }
 
         public void kill() {
-            bKeepRunning = false;
+          t.cancel();
         }
 
     }
@@ -1423,6 +1421,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void set(byte[] data)
     {
+        try {
         int index = 0;
         height = (short)(data[index] | (data[index + 1] << 8)); index += 2;
         northSpeed = (short)(data[index] | (data[index + 1] << 8)); index += 2;
@@ -1471,7 +1470,7 @@ public class MainActivity extends AppCompatActivity {
         frontLSC = (data[index] >> 2 & 0x1) == 1 ? true : false;
         index += 1;
         temperatureHeight = (int)(data[index] >> 0 & 0x1);//23
-        textViewTemp.setText("temp: "+ String.valueOf(temperatureHeight));
+        textViewTemp.setText("temp: "+ String.valueOf(temperatureHeight));}catch (Exception e){}
     }
 
     public double[] toEuler(float quatX,float quatY,float quatZ,float quatW)
