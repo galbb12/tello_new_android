@@ -9,7 +9,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.PointF;
-import android.media.MediaCodec;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiInfo;
@@ -21,6 +20,7 @@ import android.os.Environment;
 import android.os.StrictMode;
 import android.text.format.Formatter;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -28,10 +28,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 
-import com.google.common.primitives.UnsignedInteger;
-import com.google.errorprone.annotations.Var;
-
-import java.io.Console;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -44,11 +40,8 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
-import java.sql.Connection;
 import java.text.DecimalFormat;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -78,6 +71,7 @@ public class MainActivity extends AppCompatActivity {
     Boolean connected = false;
     Button takeoff;
     Button connect;
+    Button returntohome;
     Button takepicture;
     Button button_record;
     boolean[] picChunkState;
@@ -134,11 +128,14 @@ public class MainActivity extends AppCompatActivity {
     DatagramSocket socketStatusServer;
     DatagramSocket socketStreamOnServer;
     static Activity activity;
-    int bitrate = 3;
+    int bitrate = 2;
     static ControllerState controllerState;
     static ControllerState AutoPilotControllerState;
     static JoystickView joystickr;
     static JoystickView joystickl;
+    View joystickviewlocatorL;
+    View joystickviewlocatorR;
+
     int iFrameRate = 5;
     Float posX=0.0f;
     Float posY=0.0f;
@@ -156,23 +153,31 @@ public class MainActivity extends AppCompatActivity {
     boolean bLookAt=false;
     PointF lookAtTarget= new PointF(0.0f,0.0f);
     PointF autopilotTarget= new PointF(0.0f,0.0f);
+    DecoderView decoderView;
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        getSupportActionBar().hide();
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         activity = (Activity) this;
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
         StrictMode.setThreadPolicy(policy);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        decoderView=findViewById(R.id.decoderView);
+        int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_FULLSCREEN;
+        joystickviewlocatorL = findViewById(R.id.joystickgotoviewL);
+        joystickviewlocatorR     = findViewById(R.id.joystickgotoviewR);
+        decoderView.setSystemUiVisibility(uiOptions);
         joystickr = (JoystickView) findViewById(R.id.joystickView);
         joystickl = (JoystickView) findViewById(R.id.joystickView1);
         takeoff = findViewById(R.id.TakeOff);
         button_record = findViewById(R.id.record);
         //connect = findViewById(R.id.connect);
+        returntohome = findViewById(R.id.ReturnToHome);
         takepicture = findViewById(R.id.takepicture);
         textViewBattery = findViewById(R.id.textViewbattery);
         textViewTemp = findViewById(R.id.textViewTemp);
@@ -192,8 +197,73 @@ public class MainActivity extends AppCompatActivity {
         statusDatagramReceiver = new StatusDatagramReceiver();
         videoDatagramReceiver = new VideoDatagramReceiver();
         bitConverter = new BitConverter();
+        View.OnTouchListener touchListenerL = new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
 
-        takeoff.setOnClickListener(new View.OnClickListener() {
+                // save the X,Y coordinates
+                if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    joystickl.setX(v.getX()-v.getWidth()/2+event.getX());
+                    joystickl.setY(v.getY()-v.getHeight()/2+event.getY());
+                }
+
+                // let the touch event pass on to whoever needs it
+                return false;
+            }
+        };
+
+        View.OnTouchListener joystickmoverL= new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+
+                // save the X,Y coordinates
+                if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+                    v.setX(joystickviewlocatorL.getX());
+                    v.setY(joystickviewlocatorL.getY());
+                }
+
+                // let the touch event pass on to whoever needs it
+                return false;
+            }
+        };
+                joystickl.setOnTouchListener(joystickmoverL);
+        View.OnTouchListener joystickmoverR= new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+
+                // save the X,Y coordinates
+                if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+                    v.setX(joystickviewlocatorR.getX());
+                    v.setY(joystickviewlocatorR.getY());
+                }
+
+                // let the touch event pass on to whoever needs it
+                return false;
+            }
+        };
+        joystickr.setOnTouchListener(joystickmoverR);
+        joystickviewlocatorL.setOnTouchListener(touchListenerL);
+        View.OnTouchListener touchListenerR = new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+
+                // save the X,Y coordinates
+                if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    joystickr.setX(v.getX()-v.getWidth()/2+event.getX());
+                    joystickr.setY(v.getY()-v.getHeight()/2+event.getY());
+                }
+                if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+                    joystickr.setX(v.getX()-v.getWidth()/2);
+                    joystickr.setY(v.getY()-v.getHeight()/2);
+                }
+
+                // let the touch event pass on to whoever needs it
+                return false;
+            }
+        };
+        joystickviewlocatorR.setOnTouchListener(touchListenerR);
+
+            takeoff.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 takeoff();
@@ -468,7 +538,6 @@ public class MainActivity extends AppCompatActivity {
             if(connected){
             connected = false;
             StartDroneConnection();
-            DecoderView decoderView = findViewById(R.id.decoderView);
             decoderView.stop();}
 
         }
@@ -515,7 +584,7 @@ public class MainActivity extends AppCompatActivity {
                     }
 
 
-                    Thread.sleep(50);
+                    Thread.sleep(500);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -813,24 +882,22 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public Void doInBackground(byte[]... bytes) {
+            try {
             WifiManager  wifiManager = (WifiManager) getApplication().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
             ConnectivityManager connManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
             NetworkInfo mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
             if (mWifi.isConnected()) {
                 String ip = Formatter.formatIpAddress(wifiManager.getConnectionInfo().getIpAddress());
                 if (ip.startsWith("192.168.10.")) {
-            byte[] buf = bytes[0];
-            DatagramPacket packet = new DatagramPacket(buf, buf.length, inetAddressMainSending, portMainSending);
-            try {
-                socketMainSending.send(packet);
+                    byte[] buf = bytes[0];
+                    DatagramPacket packet = new DatagramPacket(buf, buf.length, inetAddressMainSending, portMainSending);
 
-            } catch (IOException e) {
-                Log.e("IOException", e.getMessage());
+                    socketMainSending.send(packet);
 
-            } catch (Exception e) {
-                Log.e("Exception", e.getMessage());
-            }
-        }}
+                }}
+
+
+        }catch (Exception e){}
 
             return null;
         }
@@ -1124,7 +1191,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void run() {
 
-            DecoderView imageView = findViewById(R.id.decoderView);
+
             byte[] videoFramenew;
 
 
@@ -1181,7 +1248,7 @@ public class MainActivity extends AppCompatActivity {
                                     //else {requestIframe();}
                                     //if(videoFramenew.length<20){requestIframe();}
                                     try {
-                                    imageView.decode(videoFramenew);}catch (Exception e){imageView.stop();}
+                                    decoderView.decode(videoFramenew);}catch (Exception e){decoderView.stop();}
                                     videoOffset = 0;
                                     videoFrame = new byte[100 * 1024];}
                                 }
@@ -1631,6 +1698,7 @@ public class MainActivity extends AppCompatActivity {
                          requestIframe();
                          controllerState.setSpeedMode(1);
                          setAttAngle(25.0f);
+                         queryAttAngle();
                          StartHeartBeatJoystick();
                          activity = (Activity) MainActivity.this;
                          setVideoBitRate(bitrate);
