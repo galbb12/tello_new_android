@@ -113,6 +113,7 @@ public class DecoderView extends TextureView {
             ex.printStackTrace();
             stop();
         }
+        try {
         (mainActivity).runOnUiThread(new Runnable() {
             public void run() {
                 //Code goes here
@@ -139,7 +140,7 @@ public class DecoderView extends TextureView {
                 textureView.setLayoutParams(lp);
                 textureView.invalidate();
                 Log.d("Configured", "Configured");
-                bConfigured = true;}});
+                bConfigured = true;}});}catch (Exception e){e.printStackTrace();};
 
         return;
 
@@ -184,23 +185,25 @@ Log.d("nal", String.valueOf(nalType));
 
         //Make sure keyframe is first.
         if (nalType == 5) {
-            bWaitForKeyframe = false;
 
+            if(array.length>3000){
+            bWaitForKeyframe = false;}
+            else {
+                mainActivity.requestIframe();
+            }
             //pps = array.ToArray();
             //return;
+        }
+        if(array.length<2400){
+            mainActivity.requestIframe();
+            if(nalType==5){
+                bWaitForKeyframe=true;
+            }
         }
         if (bWaitForKeyframe){
             return;}
 
         if (bConfigured) {
-           if(array.length<3000){//checks if the video frame isn't corrupt
-               if(nalType==5){
-                   mainActivity.requestIframe();
-            //       bWaitForKeyframe=true;
-               }
-               return;
-
-           }
             try {
                 int dequeueInputBuffer = codec.dequeueInputBuffer(-1L);
                 ByteBuffer inputBuffer = codec.getInputBuffer(dequeueInputBuffer);

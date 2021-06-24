@@ -34,6 +34,7 @@ import android.widget.Toast;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.ConnectException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -44,6 +45,7 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.sql.Time;
 import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -130,7 +132,6 @@ public class MainActivity extends AppCompatActivity {
     public static final int portMainSending = 8889;
     public static final String addressMainSending = "192.168.10.1";
     int picMode;
-    DatagramSocket socketStatusServer;
     DatagramSocket socketStreamOnServer;
     static Activity activity;
     int bitrate = 2;
@@ -355,9 +356,13 @@ public class MainActivity extends AppCompatActivity {
        //        }
        //    }
        //});
+
         if (FFmpeg.getInstance(this).isSupported()) {
             FFmpeg ffmpeg = FFmpeg.getInstance(this);
             String[] cmd= {"-y","-i",h264input, "-vcodec","copy" ,mp4output};
+            Thread thread = new Thread() {
+                @Override
+                public void run() {
             ffmpeg.execute(cmd, new ExecuteBinaryResponseHandler() {
 
                 @Override
@@ -373,13 +378,19 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 public void onSuccess(String message) {
-                    Toast.makeText(getApplicationContext(),"File saved to: "+mp4output,Toast.LENGTH_LONG).show();
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast.makeText(getApplicationContext(),"Video saved to: "+mp4output,Toast.LENGTH_LONG).show();
+                        }
+                    });
                 }
 
                 @Override
                 public void onFinish() {}
 
-            });
+            });}};
+            thread.run();
         } else {
             // ffmpeg is not supported
         }
@@ -663,7 +674,7 @@ public class MainActivity extends AppCompatActivity {
     public void Initialize() {
 
         try {
-             if(socketMainSending==null){
+             if(socketMainSending==null|| socketMainSending.isClosed()){
 
                 socketMainSending = new DatagramSocket();
             inetAddressMainSending = getInetAddressByName(addressMainSending);}
@@ -673,10 +684,9 @@ public class MainActivity extends AppCompatActivity {
             socketStreamOnServer.bind(addressVideo);}
         } catch (SocketException socketException) {
             socketException.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-
-
-
 
 
     }
@@ -1206,7 +1216,8 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void run() {
 
-
+            float speed=0.0f;
+            float time=0.0f;
             byte[] videoFramenew;
 
 
@@ -1234,7 +1245,7 @@ public class MainActivity extends AppCompatActivity {
                         //    Console.WriteLine("NAL type:" +nal);
                         started = true;
                     }
-                    if(started)
+                    if(started){
                     if (record) {
                         if(h264FilePath!=null){
                         if(fos==null){
@@ -1251,6 +1262,9 @@ public class MainActivity extends AppCompatActivity {
 
                     try {
                         if (data[2] == 0 && data[3] == 0 && data[4] == 0 && data[5] == 1) {
+                        //   if(speed<0.3&&speed>0.01){
+                        //       requestIframe();
+                        //   }
 
                             int nalType = data[6] & 0x1f;
                            // Log.d("videoOffset", String.valueOf(videoOffset));
@@ -1259,9 +1273,6 @@ public class MainActivity extends AppCompatActivity {
                                     videoFramenew = new byte[videoOffset];
                                     System.arraycopy(videoFrame, 0, videoFramenew, 0, videoOffset);
                                     Log.d("videoFrame", String.valueOf(videoFramenew.length));
-                                    //if(videoFramenew.length>20){imageView.decode(videoFramenew); }
-                                    //else {requestIframe();}
-                                    //if(videoFramenew.length<20){requestIframe();}
                                     try {
                                     decoderView.decode(videoFramenew);}catch (Exception e){decoderView.stop();}
                                     videoOffset = 0; }
@@ -1285,7 +1296,7 @@ public class MainActivity extends AppCompatActivity {
                     }
 
 
-                }
+                }}
 
                 if (socketStreamOnServer == null) {
                     socketStreamOnServer.close();
