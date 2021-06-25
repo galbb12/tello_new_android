@@ -167,17 +167,18 @@ Log.d("nal", String.valueOf(nalType));
               // }).run();
                 //bConfigured=false;
 
-                if(array.length!=sps.length){
-                    stop();
+                if(array.length<30){
+                   Init();
+                    return;
                 }
             }
-            return;
         }
         if (nalType == 8) {
-            if (array != pps) {
-                pps = array;
-            }
-            return;
+            //if (array != pps) {
+            //    pps = array;
+            //}
+            if(array.length<30){
+            return;}
         }
         if (bConfigured == false) {
             return;
@@ -186,20 +187,21 @@ Log.d("nal", String.valueOf(nalType));
         //Make sure keyframe is first.
         if (nalType == 5) {
 
-            if(array.length>3000){
-            bWaitForKeyframe = false;}
-            else {
-                mainActivity.requestIframe();
-            }
+           // if(array.length>3000){
+           // bWaitForKeyframe = false;}
+           // else {
+           //     mainActivity.requestIframe();
+           // }
+            bWaitForKeyframe=false;
             //pps = array.ToArray();
             //return;
         }
-        if(array.length<2400){
-            mainActivity.requestIframe();
-            if(nalType==5){
-                bWaitForKeyframe=true;
-            }
-        }
+       // if(array.length<2400){
+       //     mainActivity.requestIframe();
+       //     if(nalType==5){
+       //         bWaitForKeyframe=true;
+       //     }
+       // }
         if (bWaitForKeyframe){
             return;}
 

@@ -45,10 +45,12 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.sql.Array;
 import java.sql.Time;
 import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -142,7 +144,7 @@ public class MainActivity extends AppCompatActivity {
     View joystickviewlocatorL;
     View joystickviewlocatorR;
 
-    float iFrameRate = 0.5f;
+    float iFrameRate = 1.0f;
     Float posX=0.0f;
     Float posY=0.0f;
     Float posZ=0.0f;
@@ -1207,7 +1209,7 @@ public class MainActivity extends AppCompatActivity {
 
     private class VideoDatagramReceiver extends Thread {
         private boolean bKeepRunning = true;
-        public byte[] lmessage = new byte[5840];
+        public byte[] lmessage = new byte[1024*10];
         byte[] videoFrame = new byte[100 * 1024];
         int videoOffset = 0;
         Boolean started =false;
@@ -1218,6 +1220,10 @@ public class MainActivity extends AppCompatActivity {
 
             float speed=0.0f;
             float time=0.0f;
+            int SubSequenceNumber=0;
+            int SequenceNumber=0;
+            boolean publish=false;
+            ArrayList<Integer> ArraySubSequenceNumber= new ArrayList<Integer>();
             byte[] videoFramenew;
 
 
@@ -1267,21 +1273,41 @@ public class MainActivity extends AppCompatActivity {
                         //   }
 
                             int nalType = data[6] & 0x1f;
+
                            // Log.d("videoOffset", String.valueOf(videoOffset));
-                            if (videoOffset > 0) {
+                            Log.d("video offset", String.valueOf(videoOffset));
+                            if (publish||nalType==7||nalType==8) {
+
+
                                 if (!isPaused) {
                                     videoFramenew = new byte[videoOffset];
                                     System.arraycopy(videoFrame, 0, videoFramenew, 0, videoOffset);
                                     Log.d("videoFrame", String.valueOf(videoFramenew.length));
                                     try {
                                     decoderView.decode(videoFramenew);}catch (Exception e){decoderView.stop();}
-                                    videoOffset = 0; }
+                                    if(nalType==7||nalType==8){
+
+                                    }else{
+                                        videoOffset = 0;
+                                    }
+                                    publish=false;
+                                   // ArraySubSequenceNumber= new ArrayList<Integer>();
+                                }
                                 }
                             }else{
                         }
                         try {
                             System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                             videoOffset += (data.length - 2);
+                         //   Log.d("Sequence number",String.valueOf(data[0]));
+                            Log.d("Sub sequence number",String.valueOf(data[1]));
+                            SubSequenceNumber=data[1];
+
+                            if(SequenceNumber!=data[0]){
+                                publish=true;
+                            }
+                            SequenceNumber=data[0];
+                          //  ArraySubSequenceNumber.add((int) data[1]);
                         }catch (Exception e){
                             videoFrame = new byte[100 * 1024];
                             videoOffset = 0;
