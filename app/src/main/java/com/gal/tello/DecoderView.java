@@ -90,7 +90,7 @@ public class DecoderView extends TextureView {
             //videoFormat.setFloat(MediaFormat.KEY_BIT_RATE,  1.5f);
             videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
             videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
-            videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
+            //videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
             videoFormat.setFeatureEnabled(videoFormat.KEY_HDR_STATIC_INFO,false);
             videoFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
 
@@ -143,6 +143,23 @@ public class DecoderView extends TextureView {
 
     }
 
+    public void setVideoData(byte[] array){
+        int nalType = array[4] & 0x1f;
+        if(nalType==8){
+
+            pps=array;
+            Init();
+
+        }
+        else if(nalType==7){
+
+            sps=array;
+            Init();
+
+        }
+
+
+    }
 
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
@@ -154,25 +171,17 @@ public class DecoderView extends TextureView {
 
         int nalType = array[4] & 0x1f;
 //Console.WriteLine("nal:" + nalType);
-        if (nalType == 7) {
-            //sps = array.ToArray();
-            if (array != sps) {
-                sps = array;
-                // ((Runnable) () -> {
-                //     MainActivity mainActivity = new MainActivity();
-                //     mainActivity.requestIframe();
-                // }).run();
-                Init();
-            }
-            return;
-        }
-        if (nalType == 8) {
-            if (array != pps) {
-                pps = array;
-                Init();
-            }
-            return;
-        }
+
+
+
+
+
+
+
+
+
+
+
         if (bConfigured == false) {
             return;
         }

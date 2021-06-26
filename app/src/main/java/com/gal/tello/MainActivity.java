@@ -29,6 +29,7 @@ import android.widget.Toast;
 
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.ConnectException;
@@ -137,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
     View joystickviewlocatorL;
     View joystickviewlocatorR;
 
-    float iFrameRate = 1.5f;
+    float iFrameRate = 0.5f;
     Float posX=0.0f;
     Float posY=0.0f;
     Float posZ=0.0f;
@@ -512,7 +513,7 @@ public class MainActivity extends AppCompatActivity {
             Float targetYaw = (float) Math.atan2(normalizedY, normalizedX);
             Float deltaYaw = (Float.valueOf((float) (targetYaw - yaw)));
 
-            Float minDist = 0.5f;//Meters (I think)
+            Float minDist = 3f;//Meters (I think)
 
             if (dist > minDist)
             {
@@ -1270,57 +1271,63 @@ public class MainActivity extends AppCompatActivity {
 
                                 nalType = data[6] & 0x1f;
                                 // Log.d("videoOffset", String.valueOf(videoOffset));
-                                if (showframe||(nalType==7||nalType==8)) {
-                                    if(nalType==7||nalType==8){
-                                        //requestIframe();
-                                    }
+                                if (showframe) {
                                     if (!isPaused) {
                                         try {
-                                            decoderView.decode(videoFrame);}catch (Exception e){decoderView.stop();}
-                                        if(!(nalType==7||nalType==8)){
+                                            decoderView.decode(videoFrame);
+                                        } catch (Exception e) {
+                                            decoderView.stop();
+                                        }
                                         videoOffset = 0;
-                                            videoFrame = new byte[100 * 1024];}
-                                       showframe=false;
-                                       }
+                                        videoFrame = new byte[100 * 1024];
+                                        showframe = false;
+
+                                    }
                                 }
-                            }else{
+
+
+                                //System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+
+                            }
+                            Log.d("SequenceNumber", String.valueOf(data[0]));
+                            Log.d("SubSequenceNumber", String.valueOf(data[1]));
+                            Log.d("len", String.valueOf(data.length));
+                            Log.d("nal", String.valueOf(data[6] & 0x1f));
+
+
+
+                            if ((data[1] == -128)) {
+                                decoderView.setVideoData(data);
+                                showframe=true;
+                            }
+                            else if(data[1] <0){
+                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                                videoOffset += data.length - 2;
+                                showframe=true;
+                            }
+                            else {
+                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                                videoOffset += data.length - 2;
                             }
 
 
-                               //System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                                Log.d("SequenceNumber", String.valueOf(data[0]));
-                                Log.d("SubSequenceNumber", String.valueOf(data[1]));
-                                Log.d("len",String.valueOf(data.length));
-                            Log.d("nal",String.valueOf(data[6] & 0x1f));
-                            if(!(nalType==7||nalType==8)){
-                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                                videoOffset+=data.length-2;}
-                                if(data[1]<0){
-                                showframe=true;}
-                                else{
-
-                                }
 
 
 
 
 
-
-
-                        }catch (RuntimeException e) {
-                            e.printStackTrace();
-                        }
+                        }catch (Exception e){}
 
 
                     }}
 
                 if (socketStreamOnServer == null) {
                     socketStreamOnServer.close();
-                }
+                }} catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }}
 
-            }catch (Exception e){e.printStackTrace();}}
-
-        public void kill() {
+            public void kill() {
             bKeepRunning = false;
         }
     }
