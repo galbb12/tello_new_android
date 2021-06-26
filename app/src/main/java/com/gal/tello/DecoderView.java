@@ -74,32 +74,30 @@ public class DecoderView extends TextureView {
     public void Init() {
 
         if(surface == null){
-        textureView=this;
-        surfaceTexture = textureView.getSurfaceTexture();
-        surface= new Surface(surfaceTexture);}
+            textureView=this;
+            surfaceTexture = textureView.getSurfaceTexture();
+            surface= new Surface(surfaceTexture);}
         try {
-        if (sps.length == 14){
-            decoderWidth = 1280;}
-        else{
-            decoderWidth = 960;}
+            if (sps.length == 14){
+                decoderWidth = 1280;}
+            else{
+                decoderWidth = 960;}
 
-        MediaFormat videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
-        videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
-        videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
-        videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate);
-        videoFormat.setInteger(MediaFormat.KEY_BIT_RATE,  1500000);
-        videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
-        videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
+            MediaFormat videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
+            videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
+            videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
+            videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate);
+            //videoFormat.setFloat(MediaFormat.KEY_BIT_RATE,  1.5f);
+            videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
+            videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
             videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
-       videoFormat.setFeatureEnabled(videoFormat.KEY_HDR_STATIC_INFO,false);
-            videoFormat.setFeatureEnabled(videoFormat.KEY_TEMPORAL_LAYERING,true);
-            videoFormat.setFeatureEnabled(videoFormat.KEY_COLOR_TRANSFER,true);
-     //   videoFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
+            videoFormat.setFeatureEnabled(videoFormat.KEY_HDR_STATIC_INFO,false);
+            videoFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
 
 
-        String str = videoFormat.getString("mime");
-        if(codec!=null){
-        codec.release();}
+            String str = videoFormat.getString("mime");
+            if(codec!=null){
+                codec.release();}
             MediaCodec cdx = MediaCodec.createDecoderByType(str);
             cdx.configure(videoFormat, surface, (MediaCrypto) null, 0);
             cdx.start();
@@ -108,12 +106,11 @@ public class DecoderView extends TextureView {
             bWaitForKeyframe = true;
         } catch (Exception ex) {
             //handle
-          //bConfigured=false;
-          // Init();
+            //bConfigured=false;
+            // Init();
             ex.printStackTrace();
             stop();
         }
-        try {
         (mainActivity).runOnUiThread(new Runnable() {
             public void run() {
                 //Code goes here
@@ -140,7 +137,7 @@ public class DecoderView extends TextureView {
                 textureView.setLayoutParams(lp);
                 textureView.invalidate();
                 Log.d("Configured", "Configured");
-                bConfigured = true;}});}catch (Exception e){e.printStackTrace();};
+                bConfigured = true;}});
 
         return;
 
@@ -156,29 +153,23 @@ public class DecoderView extends TextureView {
         }
 
         int nalType = array[4] & 0x1f;
-Log.d("nal", String.valueOf(nalType));
+//Console.WriteLine("nal:" + nalType);
         if (nalType == 7) {
             //sps = array.ToArray();
             if (array != sps) {
                 sps = array;
-              // ((Runnable) () -> {
-              //     MainActivity mainActivity = new MainActivity();
-              //     mainActivity.requestIframe();
-              // }).run();
-                //bConfigured=false;
-
-                if(array.length<30){
-                   Init();
-                    return;
-                }
+                // ((Runnable) () -> {
+                //     MainActivity mainActivity = new MainActivity();
+                //     mainActivity.requestIframe();
+                // }).run();
             }
+            return;
         }
         if (nalType == 8) {
-            //if (array != pps) {
-            //    pps = array;
-            //}
-            if(array.length<30){
-            return;}
+            if (array != pps) {
+                pps = array;
+            }
+            return;
         }
         if (bConfigured == false) {
             return;
@@ -186,22 +177,11 @@ Log.d("nal", String.valueOf(nalType));
 
         //Make sure keyframe is first.
         if (nalType == 5) {
+            bWaitForKeyframe = false;
 
-           // if(array.length>3000){
-           // bWaitForKeyframe = false;}
-           // else {
-           //     mainActivity.requestIframe();
-           // }
-            bWaitForKeyframe=false;
             //pps = array.ToArray();
             //return;
         }
-       // if(array.length<2400){
-       //     mainActivity.requestIframe();
-       //     if(nalType==5){
-       //         bWaitForKeyframe=true;
-       //     }
-       // }
         if (bWaitForKeyframe){
             return;}
 
@@ -237,23 +217,23 @@ Log.d("nal", String.valueOf(nalType));
                     codec.setVideoScalingMode(MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT);
 
                     i = codec.dequeueOutputBuffer(BufferInfo, 0L);
-                  //  ByteBuffer buf = codec.getOutputBuffer(-1);
-                  //  byte[] imageBytes= new byte[buf.remaining()];
-                  //  buf.get(imageBytes);
-                  //  Bitmap bitmap= BitmapFactory.decodeByteArray(imageBytes,0,imageBytes.length);
-                  //  FileOutputStream out = new FileOutputStream("");
-                  //  bitmap.compress(Bitmap.CompressFormat.PNG,100,)
+                    //  ByteBuffer buf = codec.getOutputBuffer(-1);
+                    //  byte[] imageBytes= new byte[buf.remaining()];
+                    //  buf.get(imageBytes);
+                    //  Bitmap bitmap= BitmapFactory.decodeByteArray(imageBytes,0,imageBytes.length);
+                    //  FileOutputStream out = new FileOutputStream("");
+                    //  bitmap.compress(Bitmap.CompressFormat.PNG,100,)
 
-                   //Image image = codec.getOutputImage(0);
-                  //  YuvImage yuvImage = new YuvImage(YUV_420_888toNV21(image), ImageFormat.NV21, decoderWidth,decoderHeight, null);
-                  //  ByteArrayOutputStream stream = new ByteArrayOutputStream();
-                  //  yuvImage.compressToJpeg(new Rect(0, 0, decoderWidth, decoderHeight), 80, stream);
-                  //  Bitmap bitmap = BitmapFactory.decodeByteArray(stream.toByteArray(), 0, stream.size());
-                  //  try {
-                  //      stream.close();
-                  //  } catch (IOException e) {
-                  //      e.printStackTrace();
-                  //  }
+                    //Image image = codec.getOutputImage(0);
+                    //  YuvImage yuvImage = new YuvImage(YUV_420_888toNV21(image), ImageFormat.NV21, decoderWidth,decoderHeight, null);
+                    //  ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                    //  yuvImage.compressToJpeg(new Rect(0, 0, decoderWidth, decoderHeight), 80, stream);
+                    //  Bitmap bitmap = BitmapFactory.decodeByteArray(stream.toByteArray(), 0, stream.size());
+                    //  try {
+                    //      stream.close();
+                    //  } catch (IOException e) {
+                    //      e.printStackTrace();
+                    //  }
                 }
 
             } catch (Exception ex) {
@@ -266,8 +246,8 @@ Log.d("nal", String.valueOf(nalType));
 
 
                 stop();
-            }}
-        else{stop();}
+            }
+        }else{stop();}
     }
 
 
