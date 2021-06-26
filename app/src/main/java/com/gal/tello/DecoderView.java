@@ -162,12 +162,14 @@ public class DecoderView extends TextureView {
                 //     MainActivity mainActivity = new MainActivity();
                 //     mainActivity.requestIframe();
                 // }).run();
+                Init();
             }
             return;
         }
         if (nalType == 8) {
             if (array != pps) {
                 pps = array;
+                Init();
             }
             return;
         }

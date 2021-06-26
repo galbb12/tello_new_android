@@ -1204,8 +1204,8 @@ public class MainActivity extends AppCompatActivity {
 
     private class VideoDatagramReceiver extends Thread {
         private boolean bKeepRunning = true;
-        public byte[] lmessage = new byte[5840];
-        byte[] videoFrame = new byte[100 * 5840];
+        public byte[] lmessage = new byte[1460];
+        byte[] videoFrame = new byte[100 * 1460];
         int videoOffset = 0;
         Boolean started =false;
 
@@ -1218,6 +1218,7 @@ public class MainActivity extends AppCompatActivity {
             byte[] videoFramenew;
             int SequenceNumber=0;
             int SubSequenceNumber=0;
+            int nalType=0;
             ArrayList<byte[]> PacketsArray = new ArrayList<byte[]>();
             boolean showframe = false;
 
@@ -1267,18 +1268,19 @@ public class MainActivity extends AppCompatActivity {
                                 //       requestIframe();
                                 //   }
 
-                                int nalType = data[6] & 0x1f;
+                                nalType = data[6] & 0x1f;
                                 // Log.d("videoOffset", String.valueOf(videoOffset));
-                                if (showframe) {
+                                if (showframe||(nalType==7||nalType==8)) {
+                                    if(nalType==7||nalType==8){
+                                        //requestIframe();
+                                    }
                                     if (!isPaused) {
-                                        videoFramenew = new byte[videoOffset];
-                                        System.arraycopy(videoFrame, 0, videoFramenew, 0, videoOffset);
-                                        Log.d("videoFrame", String.valueOf(videoFramenew.length));
                                         try {
-                                            decoderView.decode(videoFramenew);}catch (Exception e){decoderView.stop();}
+                                            decoderView.decode(videoFrame);}catch (Exception e){decoderView.stop();}
+                                        if(!(nalType==7||nalType==8)){
                                         videoOffset = 0;
+                                            videoFrame = new byte[100 * 1024];}
                                        showframe=false;
-                                        videoFrame = new byte[100 * 1024];
                                        }
                                 }
                             }else{
@@ -1288,34 +1290,17 @@ public class MainActivity extends AppCompatActivity {
                                //System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                                 Log.d("SequenceNumber", String.valueOf(data[0]));
                                 Log.d("SubSequenceNumber", String.valueOf(data[1]));
+                                Log.d("len",String.valueOf(data.length));
+                            Log.d("nal",String.valueOf(data[6] & 0x1f));
+                            if(!(nalType==7||nalType==8)){
+                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                                videoOffset+=data.length-2;}
                                 if(data[1]<0){
-                                PacketsArray.add(PacketsArray.size()+1,data);}
+                                showframe=true;}
                                 else{
-                                    PacketsArray.add(data[1],data);
-                                }
-                                if(data[1]<0){
-                                    videoOffset=0;
-                                    Log.d("frame length", String.valueOf(PacketsArray.size()));
-                                    for(int i=0;i<PacketsArray.size();i++){
-                                        byte[] currentpacket=new byte[5840];
-                                        if(PacketsArray.get(i)[1] == (byte) i){
-                                            currentpacket =PacketsArray.get(i);
 
-                                        }
-                                        //else {
-                                        //    for(int n=i;n<PacketsArray.size();n++){
-                                        //        if(PacketsArray.get(n)[1]==i){
-                                        //            currentpacket=PacketsArray.get(n);
-                                        //            break;
-                                        //        }
-                                        //    }
-                                        //}
-
-                                        System.arraycopy(currentpacket, 2, videoFrame, videoOffset, currentpacket.length - 2);
-                                        videoOffset += (currentpacket.length - 2);
-                                    }
-                                    showframe=true;
                                 }
+
 
 
 
