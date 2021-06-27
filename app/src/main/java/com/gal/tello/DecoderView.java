@@ -38,7 +38,6 @@ import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 
 public class DecoderView extends TextureView {
-    byte[] buffer;
     private MediaCodec codec;
     private boolean bConfigured =false;
     private boolean bWaitForKeyframe = true;
@@ -86,12 +85,13 @@ public class DecoderView extends TextureView {
             MediaFormat videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
             videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
             videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
-            videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate);
-            //videoFormat.setFloat(MediaFormat.KEY_BIT_RATE,  1.5f);
-            videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
-            videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
-            //videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
-            videoFormat.setFeatureEnabled(videoFormat.KEY_HDR_STATIC_INFO,false);
+          // videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate);
+          // //videoFormat.setFloat(MediaFormat.KEY_BIT_RATE,  1.5f);
+          // videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
+          // videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
+          // //videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
+          //  videoFormat.setFeatureEnabled(videoFormat.KEY_COLOR_TRANSFER,true);
+           // videoFormat.setFeatureEnabled(videoFormat.KEY_HDR_STATIC_INFO,true);
             videoFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
 
 
@@ -144,17 +144,19 @@ public class DecoderView extends TextureView {
     }
 
     public void setVideoData(byte[] array){
+
         int nalType = array[4] & 0x1f;
-        if(nalType==8){
+       if(nalType==8){
+         if(array!=pps){
+           pps=array;
+           bConfigured=false;}
 
-            pps=array;
-            Init();
+       }
+         if(nalType==7){
 
-        }
-        else if(nalType==7){
-
-            sps=array;
-            Init();
+             if(array!=sps){
+                 sps=array;
+                 bConfigured=false;}
 
         }
 

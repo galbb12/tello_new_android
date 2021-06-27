@@ -138,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
     View joystickviewlocatorL;
     View joystickviewlocatorR;
 
-    float iFrameRate = 0.5f;
+    float iFrameRate = 3.0f;
     Float posX=0.0f;
     Float posY=0.0f;
     Float posZ=0.0f;
@@ -1045,7 +1045,7 @@ public class MainActivity extends AppCompatActivity {
 
         float boost = 0.0f;
         if (controllerState.speed > 0)
-            boost = 1.0f;
+            boost = 0.3f;
 
         //var limit = 1.0f;//Slow down while testing.
         //rx = rx * limit;
@@ -1205,8 +1205,8 @@ public class MainActivity extends AppCompatActivity {
 
     private class VideoDatagramReceiver extends Thread {
         private boolean bKeepRunning = true;
-        public byte[] lmessage = new byte[1460];
-        byte[] videoFrame = new byte[100 * 1460];
+        public byte[] lmessage = new byte[4380];
+        byte[] videoFrame = new byte[100 * 4380];
         int videoOffset = 0;
         Boolean started =false;
 
@@ -1216,7 +1216,6 @@ public class MainActivity extends AppCompatActivity {
 
             float speed=0.0f;
             float time=0.0f;
-            byte[] videoFramenew;
             int SequenceNumber=0;
             int SubSequenceNumber=0;
             int nalType=0;
@@ -1264,7 +1263,6 @@ public class MainActivity extends AppCompatActivity {
 
 
                         try {
-                            if (data[2] == 0 && data[3] == 0 && data[4] == 0 && data[5] == 1) {
                                 //   if(speed<0.3&&speed>0.01){
                                 //       requestIframe();
                                 //   }
@@ -1273,13 +1271,15 @@ public class MainActivity extends AppCompatActivity {
                                 // Log.d("videoOffset", String.valueOf(videoOffset));
                                 if (showframe) {
                                     if (!isPaused) {
+                                        byte[] videoFramenew = new byte[videoOffset];
+                                        System.arraycopy(videoFrame, 0, videoFramenew, 0, videoOffset);
                                         try {
                                             decoderView.decode(videoFrame);
                                         } catch (Exception e) {
                                             decoderView.stop();
                                         }
                                         videoOffset = 0;
-                                        videoFrame = new byte[100 * 1024];
+                                       videoFrame = new byte[100 * 1024];
                                         showframe = false;
 
                                     }
@@ -1288,7 +1288,7 @@ public class MainActivity extends AppCompatActivity {
 
                                 //System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
 
-                            }
+
                             Log.d("SequenceNumber", String.valueOf(data[0]));
                             Log.d("SubSequenceNumber", String.valueOf(data[1]));
                             Log.d("len", String.valueOf(data.length));
@@ -1296,14 +1296,49 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-                            if ((data[1] == -128)) {
+                            if (data[1] == -128) {
                                 decoderView.setVideoData(data);
                                 showframe=true;
                             }
-                            else if(data[1] <0){
+                            else if(data[1]==-125){
                                 System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                                 videoOffset += data.length - 2;
+                                Log.d("video frame len", String.valueOf(videoOffset));
+
                                 showframe=true;
+
+                            }
+                            else if(data[1]==-126){
+                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                                videoOffset += data.length - 2;
+                                Log.d("video frame len", String.valueOf(videoOffset));
+
+                                showframe=true;
+
+                            }
+                            else if(data[1]==-124){
+                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                                videoOffset += data.length - 2;
+                                Log.d("video frame len", String.valueOf(videoOffset));
+
+                                    showframe=true;
+                            }
+                            else if(data[1]==-123){
+                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                                videoOffset += data.length - 2;
+                                Log.d("video frame len", String.valueOf(videoOffset));
+                                    showframe=true;
+                            }
+                           //else if(data[1]==-121){
+                           //    System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                           //    videoOffset += data.length - 2;
+                           //    Log.d("video frame len", String.valueOf(videoOffset));
+                           //    showframe=true;
+                           //}
+                            else if(data[1]<0){
+                                videoOffset = 0;
+                                videoFrame = new byte[100 * 1024];
+                                showframe = false;
                             }
                             else {
                                 System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
@@ -1339,12 +1374,11 @@ public class MainActivity extends AppCompatActivity {
         @RequiresApi(api = Build.VERSION_CODES.O)
         @Override
         public void run() {
-            int tick = 0;
 
             while (bKeepRunning) {
                     requestIframe();
                 try {
-                    Thread.sleep((long) (iFrameRate*1000));
+                    Thread.sleep((long) (iFrameRate*100));
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
