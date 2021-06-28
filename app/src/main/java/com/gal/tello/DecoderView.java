@@ -48,6 +48,7 @@ public class DecoderView extends TextureView {
     private byte[] pps = new byte[] {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
     private int decoderWidth = 960;
     private int decoderHeight = 720;
+    private boolean bWaitForKeyframe = true;
     Context CONTEXT;
     MainActivity mainActivity;
     SurfaceTexture surfaceTexture;
@@ -85,13 +86,7 @@ public class DecoderView extends TextureView {
             videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
             videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
          videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate);
-          videoFormat.setFloat(MediaFormat.KEY_BIT_RATE,  1.5f);
-           videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
-           videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
-           videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
-          // videoFormat.setInteger(videoFormat.KEY_COLOR_STANDARD,MediaFormat.COLOR_STANDARD_BT709);
-          // videoFormat.setInteger(videoFormat.KEY_COLOR_RANGE,MediaFormat.COLOR_RANGE_LIMITED);
-           videoFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
+
 
 
             String str = videoFormat.getString("mime");
@@ -178,7 +173,14 @@ public class DecoderView extends TextureView {
 
 
 
+        if (nalType == 5) {
+            bWaitForKeyframe = false;
 
+            //pps = array.ToArray();
+            //return;
+        }
+        if (bWaitForKeyframe){
+            return;}
 
 
 

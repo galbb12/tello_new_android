@@ -130,7 +130,7 @@ public class MainActivity extends AppCompatActivity {
     int picMode;
     DatagramSocket socketStreamOnServer;
     static Activity activity;
-    int bitrate = 2;
+    int bitrate = 0;
     static ControllerState controllerState;
     static ControllerState AutoPilotControllerState;
     static JoystickView joystickr;
@@ -138,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
     View joystickviewlocatorL;
     View joystickviewlocatorR;
 
-    float iFrameRate = 4f;
+    float iFrameRate = 5f;
     Float posX=0.0f;
     Float posY=0.0f;
     Float posZ=0.0f;
@@ -1276,7 +1276,7 @@ public class MainActivity extends AppCompatActivity {
                                         try {
                                             decoderView.decode(videoFramenew);
                                         } catch (Exception e) {
-                                            decoderView.stop();
+                                         //   decoderView.stop();
                                         }
                                         videoOffset = 0;
                                        videoFrame = new byte[100 * 1024];
@@ -1303,44 +1303,44 @@ public class MainActivity extends AppCompatActivity {
                                 videoFrame = new byte[100 * 1024];
                                 showframe = false;
                             }
-                            else if(data[1]==-125){
+                     //else if(data[1]==-125){
+                     //    System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                     //    videoOffset += data.length - 2;
+                     //    Log.d("video frame len", String.valueOf(videoOffset));
+                     //    showframe=true;
+
+                     //}
+                     /// else if(data[1]==-126){
+                     ///     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                     ///     videoOffset += data.length - 2;
+                     ///     Log.d("video frame len", String.valueOf(videoOffset));
+                     ///     showframe=true;
+//
+                     /// }
+                     //else if(data[1]==-124){
+                     //    System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                     //    videoOffset += data.length - 2;
+                     //    Log.d("video frame len", String.valueOf(videoOffset));
+
+                     //        showframe=true;
+                     //}
+                     // else if(data[1]==-123){
+                     //     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                     //     videoOffset += data.length - 2;
+                     //     Log.d("video frame len", String.valueOf(videoOffset));
+                     //         showframe=true;
+                     // }
+                     ///else if(data[1]==-121){
+                     ///    System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                     ///    videoOffset += data.length - 2;
+                     ///    Log.d("video frame len", String.valueOf(videoOffset));
+                     ///    showframe=true;
+                     ///}
+                            else if(data[1]<0){
                                 System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                                 videoOffset += data.length - 2;
                                 Log.d("video frame len", String.valueOf(videoOffset));
                                 showframe=true;
-
-                            }
-                           // else if(data[1]==-126){
-                           //     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                           //     videoOffset += data.length - 2;
-                           //     Log.d("video frame len", String.valueOf(videoOffset));
-                           //     decoderView.bWaitForKeyframe=false;
-                           //     showframe=true;
-//
-                           // }
-                            else if(data[1]==-124){
-                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                                videoOffset += data.length - 2;
-                                Log.d("video frame len", String.valueOf(videoOffset));
-
-                                    showframe=true;
-                            }
-                          // else if(data[1]==-123){
-                          //     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                          //     videoOffset += data.length - 2;
-                          //     Log.d("video frame len", String.valueOf(videoOffset));
-                          //         showframe=true;
-                          // }
-                           //else if(data[1]==-121){
-                           //    System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                           //    videoOffset += data.length - 2;
-                           //    Log.d("video frame len", String.valueOf(videoOffset));
-                           //    showframe=true;
-                           //}
-                            else if(data[1]<0){
-                                videoOffset = 0;
-                                videoFrame = new byte[100 * 1024];
-                                showframe = false;
                             }
                             else {
                                 System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
