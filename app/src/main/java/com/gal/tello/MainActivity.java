@@ -138,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
     View joystickviewlocatorL;
     View joystickviewlocatorR;
 
-    float iFrameRate = 3.0f;
+    float iFrameRate = 4f;
     Float posX=0.0f;
     Float posY=0.0f;
     Float posZ=0.0f;
@@ -318,7 +318,7 @@ public class MainActivity extends AppCompatActivity {
 
 
                         DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyy-dd-M--HH-mm-ss");
-                        h264FilePath = new File(filechache.getPath() + "/" + LocalDateTime.now().format(format) + ".h264");
+                        h264FilePath = new File(filechache.getPath() + "/" + LocalDateTime.now().format(format) + ".raw");
                         videoFilePath = new File(filevideo.getPath() + "/" + LocalDateTime.now().format(format) + ".mp4");
                         button_record.setText("Stop recording");
                         fos=null;
@@ -1254,7 +1254,7 @@ public class MainActivity extends AppCompatActivity {
                                     fos = new FileOutputStream(h264FilePath,true);
                                 }
                                 try {
-                                    fos.write(data, 2, data.length - 2);
+                                    fos.write(data, 0, data.length);
                                 } catch (IOException e) {
                                     e.printStackTrace();
                                 }}}
@@ -1274,7 +1274,7 @@ public class MainActivity extends AppCompatActivity {
                                         byte[] videoFramenew = new byte[videoOffset];
                                         System.arraycopy(videoFrame, 0, videoFramenew, 0, videoOffset);
                                         try {
-                                            decoderView.decode(videoFrame);
+                                            decoderView.decode(videoFramenew);
                                         } catch (Exception e) {
                                             decoderView.stop();
                                         }
@@ -1298,24 +1298,26 @@ public class MainActivity extends AppCompatActivity {
 
                             if (data[1] == -128) {
                                 decoderView.setVideoData(data);
-                                showframe=true;
+                                //showframe=true;
+                                videoOffset = 0;
+                                videoFrame = new byte[100 * 1024];
+                                showframe = false;
                             }
                             else if(data[1]==-125){
                                 System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                                 videoOffset += data.length - 2;
                                 Log.d("video frame len", String.valueOf(videoOffset));
-
                                 showframe=true;
 
                             }
-                            else if(data[1]==-126){
-                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                                videoOffset += data.length - 2;
-                                Log.d("video frame len", String.valueOf(videoOffset));
-
-                                showframe=true;
-
-                            }
+                           // else if(data[1]==-126){
+                           //     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                           //     videoOffset += data.length - 2;
+                           //     Log.d("video frame len", String.valueOf(videoOffset));
+                           //     decoderView.bWaitForKeyframe=false;
+                           //     showframe=true;
+//
+                           // }
                             else if(data[1]==-124){
                                 System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                                 videoOffset += data.length - 2;
@@ -1323,12 +1325,12 @@ public class MainActivity extends AppCompatActivity {
 
                                     showframe=true;
                             }
-                            else if(data[1]==-123){
-                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                                videoOffset += data.length - 2;
-                                Log.d("video frame len", String.valueOf(videoOffset));
-                                    showframe=true;
-                            }
+                          // else if(data[1]==-123){
+                          //     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                          //     videoOffset += data.length - 2;
+                          //     Log.d("video frame len", String.valueOf(videoOffset));
+                          //         showframe=true;
+                          // }
                            //else if(data[1]==-121){
                            //    System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                            //    videoOffset += data.length - 2;
@@ -1378,7 +1380,7 @@ public class MainActivity extends AppCompatActivity {
             while (bKeepRunning) {
                     requestIframe();
                 try {
-                    Thread.sleep((long) (iFrameRate*100));
+                    Thread.sleep((long) (1000/iFrameRate));
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }

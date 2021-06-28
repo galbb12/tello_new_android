@@ -40,7 +40,6 @@ import java.time.LocalDateTime;
 public class DecoderView extends TextureView {
     private MediaCodec codec;
     private boolean bConfigured =false;
-    private boolean bWaitForKeyframe = true;
     //pic mode sps
     private byte[] sps = new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 60, (byte) 5, (byte) 185};
 
@@ -85,14 +84,14 @@ public class DecoderView extends TextureView {
             MediaFormat videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
             videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
             videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
-          // videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate);
-          // //videoFormat.setFloat(MediaFormat.KEY_BIT_RATE,  1.5f);
-          // videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
-          // videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
-          // //videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
-          //  videoFormat.setFeatureEnabled(videoFormat.KEY_COLOR_TRANSFER,true);
-           // videoFormat.setFeatureEnabled(videoFormat.KEY_HDR_STATIC_INFO,true);
-            videoFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
+         videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate);
+          videoFormat.setFloat(MediaFormat.KEY_BIT_RATE,  1.5f);
+           videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
+           videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
+           videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
+          // videoFormat.setInteger(videoFormat.KEY_COLOR_STANDARD,MediaFormat.COLOR_STANDARD_BT709);
+          // videoFormat.setInteger(videoFormat.KEY_COLOR_RANGE,MediaFormat.COLOR_RANGE_LIMITED);
+           videoFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
 
 
             String str = videoFormat.getString("mime");
@@ -103,15 +102,7 @@ public class DecoderView extends TextureView {
             cdx.start();
 
             codec = cdx;
-            bWaitForKeyframe = true;
-        } catch (Exception ex) {
-            //handle
-            //bConfigured=false;
-            // Init();
-            ex.printStackTrace();
-            stop();
-        }
-        (mainActivity).runOnUiThread(new Runnable() {
+        mainActivity.runOnUiThread(new Runnable() {
             public void run() {
                 //Code goes here
                 int videoWidth = decoderWidth;
@@ -140,6 +131,13 @@ public class DecoderView extends TextureView {
                 bConfigured = true;}});
 
         return;
+        } catch (Exception ex) {
+            //handle
+            //bConfigured=false;
+            // Init();
+            ex.printStackTrace();
+            //stop();
+        }
 
     }
 
@@ -149,14 +147,15 @@ public class DecoderView extends TextureView {
        if(nalType==8){
          if(array!=pps){
            pps=array;
-           bConfigured=false;}
+           Init();}
 
        }
          if(nalType==7){
 
              if(array!=sps){
                  sps=array;
-                 bConfigured=false;}
+                 bConfigured=false;
+             Init();}
 
         }
 
@@ -189,14 +188,14 @@ public class DecoderView extends TextureView {
         }
 
         //Make sure keyframe is first.
-        if (nalType == 5) {
-            bWaitForKeyframe = false;
+       //if (nalType == 5) {
+       //    bWaitForKeyframe = false;
 
-            //pps = array.ToArray();
-            //return;
-        }
-        if (bWaitForKeyframe){
-            return;}
+       //    //pps = array.ToArray();
+       //    //return;
+       //
+       //}
+
 
         if (bConfigured) {
             try {
