@@ -85,7 +85,9 @@ public class DecoderView extends TextureView {
             MediaFormat videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
             videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
             videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
-         //videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate);
+         videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate);
+         videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
+            videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
             //videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
         //    videoFormat.setInteger(MediaFormat.KEY_FRAME_RATE,25);
 

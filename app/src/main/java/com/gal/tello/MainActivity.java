@@ -318,7 +318,7 @@ public class MainActivity extends AppCompatActivity {
 
 
                         DateTimeFormatter format = DateTimeFormatter.ofPattern("yyyy-dd-M--HH-mm-ss");
-                        h264FilePath = new File(filechache.getPath() + "/" + LocalDateTime.now().format(format) + ".raw");
+                        h264FilePath = new File(filechache.getPath() + "/" + LocalDateTime.now().format(format) + ".h264");
                         videoFilePath = new File(filevideo.getPath() + "/" + LocalDateTime.now().format(format) + ".mp4");
                         button_record.setText("Stop recording");
                         fos=null;
@@ -1230,138 +1230,132 @@ e.printStackTrace();
             Log.d("video start", "start");
             DatagramPacket packet = new DatagramPacket(lmessage, lmessage.length);
 
-            try {
+
+            while (bKeepRunning) {
+
+                try {
+                    socketStreamOnServer.receive(packet);
+                } catch (IOException ioException) {
 
 
-                while (bKeepRunning) {
+                }
+                packetlen++;
+
+                byte[] data = new byte[packet.getLength()];
+                //Log.d("Video Length", String.valueOf(data.length));
+                System.arraycopy(packet.getData(), 0, data, 0, packet.getLength());
+                if (data[2] == 0 && data[3] == 0 && data[4] == 0 && data[5] == 1&&!started)//Wait for first NAL
+                {
+                    int nal = (data[6] & 0x1f);
+                    //if (nal != 0x01 && nal!=0x07 && nal != 0x08 && nal != 0x05)
+                    //    Console.WriteLine("NAL type:" +nal);
+                    started = true;
+                }
+                if(started){
+
+
+
+
 
                     try {
-                        socketStreamOnServer.receive(packet);
-                    } catch (IOException ioException) {
+                            //   if(speed<0.3&&speed>0.01){
+                            //       requestIframe();
+                            //   }
 
-
-                    }
-                    packetlen++;
-
-                    byte[] data = new byte[packet.getLength()];
-                    //Log.d("Video Length", String.valueOf(data.length));
-                    System.arraycopy(packet.getData(), 0, data, 0, packet.getLength());
-                    if (data[2] == 0 && data[3] == 0 && data[4] == 0 && data[5] == 1&&!started)//Wait for first NAL
-                    {
-                        int nal = (data[6] & 0x1f);
-                        //if (nal != 0x01 && nal!=0x07 && nal != 0x08 && nal != 0x05)
-                        //    Console.WriteLine("NAL type:" +nal);
-                        started = true;
-                    }
-                    if(started){
-                        if (record) {
-                            if(h264FilePath!=null){
-                                if(fos==null){
-                                    fos = new FileOutputStream(h264FilePath,true);
-                                }
-                                try {
-                                    fos.write(data, 0, data.length);
-                                } catch (IOException e) {
-                                    e.printStackTrace();
-                                }}}
-
-
-
-
-                        try {
-                                //   if(speed<0.3&&speed>0.01){
-                                //       requestIframe();
-                                //   }
-
-                                nalType = data[6] & 0x1f;
-                                // Log.d("videoOffset", String.valueOf(videoOffset));
-                                if (showframe) {
-                                    if (!isPaused) {
-                                        byte[] videoFramenew = new byte[videoOffset];
-                                        System.arraycopy(videoFrame, 0, videoFramenew, 0, videoOffset);
-                                        try {
-                                            decoderView.decode(videoFramenew);
-                                        } catch (Exception e) {
-                                      //      decoderView.stop();
-                                        }
-                                        videoOffset = 0;
-                                       videoFrame = new byte[100 * 1024];
-                                        showframe = false;
-                                        packetlen=0;
-
+                            nalType = data[6] & 0x1f;
+                            // Log.d("videoOffset", String.valueOf(videoOffset));
+                            if (showframe) {
+                                if (!isPaused) {
+                                    byte[] videoFramenew = new byte[videoOffset];
+                                    System.arraycopy(videoFrame, 0, videoFramenew, 0, videoOffset);
+                                    try {
+                                        decoderView.decode(videoFrame);
+                                    } catch (Exception e) {
+                                  //      decoderView.stop();
                                     }
+                                    videoOffset = 0;
+                                   videoFrame = new byte[100 * 1024];
+                                    showframe = false;
+                                    packetlen=0;
+
                                 }
-
-
-                                //System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-
-
-                            Log.d("SequenceNumber", String.valueOf(data[0]));
-                            Log.d("SubSequenceNumber", String.valueOf(data[1]));
-                            Log.d("len", String.valueOf(data.length));
-                            Log.d("nal", String.valueOf(data[6] & 0x1f));
-
-
-
-                            if (data[1] == -128) {
-                                decoderView.setVideoData(data);
-                                //showframe=true;
-                                videoOffset = 0;
-                                videoFrame = new byte[100 * 1024];
-                                showframe = false;
-                            }
-                            else if(data[1]==-124) {
-                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                                videoOffset += data.length - 2;
-                                Log.d("video frame len", String.valueOf(videoOffset));
-                                if (Math.abs(9 - (packetlen)) >= Math.abs(data[1] + 120)) {
-                                    showframe = true;
-                                } else {
-                                    requestIframe();
-
-                                }}
-                                //videoOffset = 0;
-                                //videoFrame = new byte[100 * 1024];
-                                //packetlen=0;
-                            //else if(data[1]==-124){
-                            //    System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                            //    videoOffset += data.length - 2;
-                            //    //if(!(packetlen>=3)) {
-                            //    //    requestIframe();
-                            //    //}else{
-                            //    Log.d("video frame len", String.valueOf(videoOffset));
-                            //    showframe=true;//}
-                            //}
-                           // else if(data[1]==-123){
-                           //     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                           //     videoOffset += data.length - 2;
-                           //     if(!(packetlen>=5)) {
-                           //         requestIframe();
-                           //     }else{
-                           //     Log.d("video frame len", String.valueOf(videoOffset));
-                           //     showframe=true;}
-                           // }
-                            else if(data[1]<=-100) {
-                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                                videoOffset += data.length - 2;
-                                Log.d("video frame len", String.valueOf(videoOffset));
-
-                                showframe = true;
-                                //videoOffset = 0;
-                                //videoFrame = new byte[100 * 1024];
-                                //packetlen=0;
                             }
 
 
-                        // else if(data[1]<0){
-                        //        videoOffset = 0;
-                        //        videoFrame = new byte[100 * 1024];
-                        //        packetlen=0;
-                        //    }
-                            else {
-                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                                videoOffset += data.length - 2;
-                            }
+                            //System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+
+
+                        Log.d("SequenceNumber", String.valueOf(data[0]));
+                        Log.d("SubSequenceNumber", String.valueOf(data[1]));
+                        Log.d("len", String.valueOf(data.length));
+                        Log.d("nal", String.valueOf(data[6] & 0x1f));
+
+
+
+                        if (data[1] == -128) {
+                            decoderView.setVideoData(data);
+                            //showframe=true;
+                            videoOffset = 0;
+                            videoFrame = new byte[100 * 1024];
+                            showframe = false;
+                        }
+                       // else if(data[1]==-124) {
+                       //     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                       //     videoOffset += data.length - 2;
+                       //     Log.d("video frame len", String.valueOf(videoOffset));
+                       //     if (Math.abs(9 - (packetlen)) >= Math.abs(data[1] + 120)) {
+                       //         showframe = true;
+                       //     } else {
+                       //         requestIframe();
+//
+                       //     }}
+                            //videoOffset = 0;
+                            //videoFrame = new byte[100 * 1024];
+                            //packetlen=0;
+                        //else if(data[1]==-124){
+                        //    System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                        //    videoOffset += data.length - 2;
+                        //    //if(!(packetlen>=3)) {
+                        //    //    requestIframe();
+                        //    //}else{
+                        //    Log.d("video frame len", String.valueOf(videoOffset));
+                        //    showframe=true;//}
+                        //}
+                       // else if(data[1]==-123){
+                       //     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                       //     videoOffset += data.length - 2;
+                       //     if(!(packetlen>=5)) {
+                       //         requestIframe();
+                       //     }else{
+                       //     Log.d("video frame len", String.valueOf(videoOffset));
+                       //     showframe=true;}
+                       // }
+                        else if(data[1]<=-100) {
+                            System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                            videoOffset += data.length - 2;
+                            Log.d("video frame len", String.valueOf(videoOffset));
+
+                            showframe = true;
+                            //videoOffset = 0;
+                            //videoFrame = new byte[100 * 1024];
+                            //packetlen=0;
+                        }
+
+
+                     else if(data.length!=1460){
+                            videoOffset = 0;
+                            videoFrame = new byte[100 * 1024];
+                            packetlen=0;
+                        }
+                        else if(data[1]<0){
+                            videoOffset = 0;
+                            videoFrame = new byte[100 * 1024];
+                            packetlen=0;
+                        }
+                        else {
+                            System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                            videoOffset += data.length - 2;
+                        }
 
 
 
@@ -1369,16 +1363,15 @@ e.printStackTrace();
 
 
 
-                        }catch (Exception e){}
+                    }catch (Exception e){}
 
 
-                    }}
+                }}
 
-                if (socketStreamOnServer == null) {
-                    socketStreamOnServer.close();
-                }} catch (FileNotFoundException e) {
-                e.printStackTrace();
-            }}
+            if (socketStreamOnServer == null) {
+                socketStreamOnServer.close();
+            }
+        }
 
             public void kill() {
             bKeepRunning = false;
