@@ -164,7 +164,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        getSupportActionBar().hide();
+       // getSupportActionBar().hide();
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -1310,6 +1310,19 @@ e.printStackTrace();
                                 videoFrame = new byte[100 * 1024];
                                 showframe = false;
                             }
+                            else if(data[1]==-124) {
+                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                                videoOffset += data.length - 2;
+                                Log.d("video frame len", String.valueOf(videoOffset));
+                                if (Math.abs(9 - (packetlen)) >= Math.abs(data[1] + 120)) {
+                                    showframe = true;
+                                } else {
+                                    requestIframe();
+
+                                }}
+                                //videoOffset = 0;
+                                //videoFrame = new byte[100 * 1024];
+                                //packetlen=0;
                             //else if(data[1]==-124){
                             //    System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                             //    videoOffset += data.length - 2;
@@ -1328,28 +1341,23 @@ e.printStackTrace();
                            //     Log.d("video frame len", String.valueOf(videoOffset));
                            //     showframe=true;}
                            // }
-                            else if(data[1]<=-100){
+                            else if(data[1]<=-100) {
                                 System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                                 videoOffset += data.length - 2;
                                 Log.d("video frame len", String.valueOf(videoOffset));
-                                if(nalType==5||nalType==1){
-                                if(Math.abs(9-(packetlen))>=Math.abs(data[1]+120)){
-                                showframe=true;}
-                                else{
-                                    requestIframe();
 
-                                    }
-                                    //videoOffset = 0;
-                                    //videoFrame = new byte[100 * 1024];
-                                    //packetlen=0;
-                                }else{showframe=true;}}
-
-
-                         else if(data[1]<0){
-                                videoOffset = 0;
-                                videoFrame = new byte[100 * 1024];
-                                packetlen=0;
+                                showframe = true;
+                                //videoOffset = 0;
+                                //videoFrame = new byte[100 * 1024];
+                                //packetlen=0;
                             }
+
+
+                        // else if(data[1]<0){
+                        //        videoOffset = 0;
+                        //        videoFrame = new byte[100 * 1024];
+                        //        packetlen=0;
+                        //    }
                             else {
                                 System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                                 videoOffset += data.length - 2;
@@ -1990,7 +1998,6 @@ e.printStackTrace();
     @Override
     public void onPause() {
         super.onPause();
-        DecoderView decoderView = findViewById(R.id.decoderView);
         decoderView.stop();
         isPaused = true;
         controllerState.setAxis(0, 0, 0, 0);

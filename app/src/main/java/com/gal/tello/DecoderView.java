@@ -112,7 +112,7 @@ public class DecoderView extends TextureView {
                     float screenProportion = (float) screenWidth / (float) screenHeight;
 
                     // Get the SurfaceView layout parameters
-            ConstraintLayout.LayoutParams lp = (ConstraintLayout.LayoutParams) this.getLayoutParams();
+                ConstraintLayout.LayoutParams lp = (ConstraintLayout.LayoutParams) this.getLayoutParams();
                     if (videoProportion > screenProportion) {
                         lp.width = screenWidth;
                         lp.height = (int) ((float) screenWidth / videoProportion);
