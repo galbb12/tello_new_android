@@ -21,12 +21,15 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ImageView;
+import android.widget.RelativeLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.constraintlayout.widget.ConstraintLayout;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
@@ -96,11 +99,7 @@ public class DecoderView extends TextureView {
             cdx.start();
 
             codec = cdx;
-            Handler mainHandler = new Handler(Looper.getMainLooper());
 
-            Runnable myRunnable = new Runnable() {
-                @Override
-                public void run() {
                     //Code goes here
                     int videoWidth = decoderWidth;
                     int videoHeight = decoderHeight;
@@ -113,7 +112,7 @@ public class DecoderView extends TextureView {
                     float screenProportion = (float) screenWidth / (float) screenHeight;
 
                     // Get the SurfaceView layout parameters
-                    android.view.ViewGroup.LayoutParams lp = textureView.getLayoutParams();
+            ConstraintLayout.LayoutParams lp = (ConstraintLayout.LayoutParams) this.getLayoutParams();
                     if (videoProportion > screenProportion) {
                         lp.width = screenWidth;
                         lp.height = (int) ((float) screenWidth / videoProportion);
@@ -122,14 +121,13 @@ public class DecoderView extends TextureView {
                         lp.height = screenHeight;
                     }
                     // Commit the layout parameters
-                    textureView.setLayoutParams(lp);
-                    textureView.invalidate();
+                    this.setLayoutParams(lp);
                     Log.d("Configured", "Configured");
-                    bConfigured = true;}// This is your code
-            };
-            mainHandler.post(myRunnable);
+                    bConfigured = true;// This is your code
 
-        return;
+
+
+     //   return;
         } catch (Exception exception) {
             //handle
             //bConfigured=false;

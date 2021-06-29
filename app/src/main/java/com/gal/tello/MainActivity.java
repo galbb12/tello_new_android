@@ -138,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
     View joystickviewlocatorL;
     View joystickviewlocatorR;
 
-    float iFrameRate = 3f;
+    float iFrameRate = 4f;
     Float posX=0.0f;
     Float posY=0.0f;
     Float posZ=0.0f;
@@ -1310,36 +1310,46 @@ e.printStackTrace();
                                 videoFrame = new byte[100 * 1024];
                                 showframe = false;
                             }
-                            else if(data[1]==-124){
-                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                                videoOffset += data.length - 2;
-                                if(!(packetlen>=4)) {
-                                    requestIframe();
-                                }else{
-                                Log.d("video frame len", String.valueOf(videoOffset));
-                                showframe=true;}
-                            }
-                            else if(data[1]==-123){
-                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                                videoOffset += data.length - 2;
-                                if(!(packetlen>=5)) {
-                                    requestIframe();
-                                }else{
-                                Log.d("video frame len", String.valueOf(videoOffset));
-                                showframe=true;}
-                            }
+                            //else if(data[1]==-124){
+                            //    System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                            //    videoOffset += data.length - 2;
+                            //    //if(!(packetlen>=3)) {
+                            //    //    requestIframe();
+                            //    //}else{
+                            //    Log.d("video frame len", String.valueOf(videoOffset));
+                            //    showframe=true;//}
+                            //}
+                           // else if(data[1]==-123){
+                           //     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                           //     videoOffset += data.length - 2;
+                           //     if(!(packetlen>=5)) {
+                           //         requestIframe();
+                           //     }else{
+                           //     Log.d("video frame len", String.valueOf(videoOffset));
+                           //     showframe=true;}
+                           // }
                             else if(data[1]<=-100){
                                 System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                                 videoOffset += data.length - 2;
                                 Log.d("video frame len", String.valueOf(videoOffset));
-                                showframe=true;
-                            }
+                                if(nalType==5||nalType==1){
+                                if(Math.abs(9-(packetlen))>=Math.abs(data[1]+120)){
+                                showframe=true;}
+                                else{
+                                    requestIframe();
 
-                         //else if(data[1]<0){
-                         //       videoOffset = 0;
-                         //       videoFrame = new byte[100 * 1024];
-                         //       packetlen=0;
-                         //   }
+                                    }
+                                    //videoOffset = 0;
+                                    //videoFrame = new byte[100 * 1024];
+                                    //packetlen=0;
+                                }else{showframe=true;}}
+
+
+                         else if(data[1]<0){
+                                videoOffset = 0;
+                                videoFrame = new byte[100 * 1024];
+                                packetlen=0;
+                            }
                             else {
                                 System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                                 videoOffset += data.length - 2;
@@ -1764,6 +1774,7 @@ e.printStackTrace();
                             Log.d("Cmd id", String.valueOf(cmdId));
                             String dataString= new String(packet.getData(), StandardCharsets.UTF_8);
                             if(dataString.startsWith("conn_ack")&&connected==false){
+                                connected = true;
                                 setPicVidMode(0);
                                 streamon();
                                 setEis(0);
@@ -1776,7 +1787,7 @@ e.printStackTrace();
                                 setVideoBitRate(bitrate);
                                 setBatteryLowLevel(10);
                                 setAttitude(30);
-                                connected = true;
+                                decoderView.Init();
 
                             }
                             if (cmdId >= 74 && cmdId < 80) {
