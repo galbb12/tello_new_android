@@ -7,16 +7,13 @@ import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
 import android.graphics.Rect;
 import android.graphics.SurfaceTexture;
-import android.graphics.YuvImage;
-import android.media.Image;
+
 import android.media.MediaCodec;
 import android.media.MediaCrypto;
 import android.media.MediaFormat;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.Message;
-import android.provider.MediaStore;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
@@ -77,15 +74,17 @@ public class DecoderView extends TextureView {
             surfaceTexture = textureView.getSurfaceTexture();
             surface= new Surface(surfaceTexture);}
         try {
-            if (sps.length == 14){
-                decoderWidth = 1280;}
-            else{
-                decoderWidth = 960;}
+           // if (sps.length == 14){
+           //     decoderWidth = 1280;}
+           // else{
+           //     decoderWidth = 960;}
 
             MediaFormat videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
             videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
             videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
-         videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate);
+         //videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate);
+            //videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
+        //    videoFormat.setInteger(MediaFormat.KEY_FRAME_RATE,25);
 
 
 
@@ -97,40 +96,45 @@ public class DecoderView extends TextureView {
             cdx.start();
 
             codec = cdx;
-        mainActivity.runOnUiThread(new Runnable() {
-            public void run() {
-                //Code goes here
-                int videoWidth = decoderWidth;
-                int videoHeight = decoderHeight;
-                float videoProportion = (float) videoWidth / (float) videoHeight;
-                WindowManager windowManager = (WindowManager) CONTEXT.getSystemService(Context.WINDOW_SERVICE);
+            Handler mainHandler = new Handler(Looper.getMainLooper());
 
-                // Get the width of the screen
-                int screenWidth =  windowManager.getDefaultDisplay().getWidth();
-                int screenHeight = windowManager.getDefaultDisplay().getHeight();
-                float screenProportion = (float) screenWidth / (float) screenHeight;
+            Runnable myRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    //Code goes here
+                    int videoWidth = decoderWidth;
+                    int videoHeight = decoderHeight;
+                    float videoProportion = (float) videoWidth / (float) videoHeight;
+                    WindowManager windowManager = (WindowManager) mainActivity.activity.getSystemService(Context.WINDOW_SERVICE);
 
-                // Get the SurfaceView layout parameters
-                android.view.ViewGroup.LayoutParams lp = textureView.getLayoutParams();
-                if (videoProportion > screenProportion) {
-                    lp.width = screenWidth;
-                    lp.height = (int) ((float) screenWidth / videoProportion);
-                } else {
-                    lp.width = (int) (videoProportion * (float) screenHeight);
-                    lp.height = screenHeight;
-                }
-                // Commit the layout parameters
-                textureView.setLayoutParams(lp);
-                textureView.invalidate();
-                Log.d("Configured", "Configured");
-                bConfigured = true;}});
+                    // Get the width of the screen
+                    int screenWidth =  windowManager.getDefaultDisplay().getWidth();
+                    int screenHeight = windowManager.getDefaultDisplay().getHeight();
+                    float screenProportion = (float) screenWidth / (float) screenHeight;
+
+                    // Get the SurfaceView layout parameters
+                    android.view.ViewGroup.LayoutParams lp = textureView.getLayoutParams();
+                    if (videoProportion > screenProportion) {
+                        lp.width = screenWidth;
+                        lp.height = (int) ((float) screenWidth / videoProportion);
+                    } else {
+                        lp.width = (int) (videoProportion * (float) screenHeight);
+                        lp.height = screenHeight;
+                    }
+                    // Commit the layout parameters
+                    textureView.setLayoutParams(lp);
+                    textureView.invalidate();
+                    Log.d("Configured", "Configured");
+                    bConfigured = true;}// This is your code
+            };
+            mainHandler.post(myRunnable);
 
         return;
-        } catch (Exception ex) {
+        } catch (Exception exception) {
             //handle
             //bConfigured=false;
             // Init();
-            ex.printStackTrace();
+            exception.printStackTrace();
             //stop();
         }
 
@@ -166,18 +170,14 @@ public class DecoderView extends TextureView {
         }
 
         int nalType = array[4] & 0x1f;
-//Console.WriteLine("nal:" + nalType);
 
 
 
 
 
 
-        if (nalType == 5) {
+        if (nalType == 5||nalType==1) {
             bWaitForKeyframe = false;
-
-            //pps = array.ToArray();
-            //return;
         }
         if (bWaitForKeyframe){
             return;}
@@ -189,14 +189,6 @@ public class DecoderView extends TextureView {
             return;
         }
 
-        //Make sure keyframe is first.
-       //if (nalType == 5) {
-       //    bWaitForKeyframe = false;
-
-       //    //pps = array.ToArray();
-       //    //return;
-       //
-       //}
 
 
         if (bConfigured) {
@@ -231,6 +223,20 @@ public class DecoderView extends TextureView {
                     codec.setVideoScalingMode(MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT);
 
                     i = codec.dequeueOutputBuffer(BufferInfo, 0L);
+
+                   switch (i) {
+                       case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
+                           break;
+
+                       case MediaCodec.INFO_TRY_AGAIN_LATER:
+                           mainActivity.requestIframe();
+
+                       case MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED:
+                           break;
+
+                       default:
+                           break;
+                   }
                     //  ByteBuffer buf = codec.getOutputBuffer(-1);
                     //  byte[] imageBytes= new byte[buf.remaining()];
                     //  buf.get(imageBytes);

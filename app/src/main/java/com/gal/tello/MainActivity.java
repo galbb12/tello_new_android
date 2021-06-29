@@ -130,7 +130,7 @@ public class MainActivity extends AppCompatActivity {
     int picMode;
     DatagramSocket socketStreamOnServer;
     static Activity activity;
-    int bitrate = 0;
+    int bitrate = 2;
     static ControllerState controllerState;
     static ControllerState AutoPilotControllerState;
     static JoystickView joystickr;
@@ -138,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
     View joystickviewlocatorL;
     View joystickviewlocatorR;
 
-    float iFrameRate = 5f;
+    float iFrameRate = 3f;
     Float posX=0.0f;
     Float posY=0.0f;
     Float posZ=0.0f;
@@ -204,7 +204,7 @@ public class MainActivity extends AppCompatActivity {
         bitConverter = new BitConverter();
         wifiManager= (WifiManager) getApplication().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         connManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        mWifi       = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
+        mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
         View.OnTouchListener touchListenerL = new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -565,7 +565,8 @@ public class MainActivity extends AppCompatActivity {
             if(connected){
                 connected = false;
                 StartDroneConnection();
-                decoderView.stop();}
+                decoderView.stop();
+                }
 
         }
 
@@ -742,10 +743,10 @@ public class MainActivity extends AppCompatActivity {
                 socketMainSending.send(packet);
 
             } catch (IOException e) {
-                Log.e("IOException", e.getMessage());
+e.printStackTrace();
 
             } catch (Exception e) {
-                Log.e("Exception", e.getMessage());
+e.printStackTrace();
             }
             return null;
         }
@@ -873,7 +874,7 @@ public class MainActivity extends AppCompatActivity {
         SendOneBytePacketWithoutReplay sendOneBytePacketWithoutReplay = new SendOneBytePacketWithoutReplay();
         sendOneBytePacketWithoutReplay.doInBackground(packet);
         // DecoderView decoderView = findViewById(R.id.decoderView);
-        // decoderView.stop();
+         decoderView.stop();
 
     }
 
@@ -905,6 +906,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         protected Void doInBackground(byte[]... bytes) {
             try {
+                mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
 
                 if (mWifi.isConnected()) {
                     String ip = Formatter.formatIpAddress(wifiManager.getConnectionInfo().getIpAddress());
@@ -917,7 +919,8 @@ public class MainActivity extends AppCompatActivity {
                     }}
 
 
-            }catch (Exception e){e.printStackTrace();}
+            }catch (Exception e){//e.printStackTrace();
+                 }
 
 
             return null;
@@ -945,10 +948,10 @@ public class MainActivity extends AppCompatActivity {
 
 
             } catch (IOException e) {
-                Log.e("IOException", e.getMessage());
+e.printStackTrace();
 
             } catch (Exception e) {
-                Log.e("Exception", e.getMessage());
+e.printStackTrace();
             }
             return doneText;
         }
@@ -1219,6 +1222,7 @@ public class MainActivity extends AppCompatActivity {
             int SequenceNumber=0;
             int SubSequenceNumber=0;
             int nalType=0;
+            int packetlen=0;
             ArrayList<byte[]> PacketsArray = new ArrayList<byte[]>();
             boolean showframe = false;
 
@@ -1237,6 +1241,8 @@ public class MainActivity extends AppCompatActivity {
 
 
                     }
+                    packetlen++;
+
                     byte[] data = new byte[packet.getLength()];
                     //Log.d("Video Length", String.valueOf(data.length));
                     System.arraycopy(packet.getData(), 0, data, 0, packet.getLength());
@@ -1276,11 +1282,12 @@ public class MainActivity extends AppCompatActivity {
                                         try {
                                             decoderView.decode(videoFramenew);
                                         } catch (Exception e) {
-                                         //   decoderView.stop();
+                                      //      decoderView.stop();
                                         }
                                         videoOffset = 0;
                                        videoFrame = new byte[100 * 1024];
                                         showframe = false;
+                                        packetlen=0;
 
                                     }
                                 }
@@ -1303,45 +1310,36 @@ public class MainActivity extends AppCompatActivity {
                                 videoFrame = new byte[100 * 1024];
                                 showframe = false;
                             }
-                     //else if(data[1]==-125){
-                     //    System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                     //    videoOffset += data.length - 2;
-                     //    Log.d("video frame len", String.valueOf(videoOffset));
-                     //    showframe=true;
-
-                     //}
-                     /// else if(data[1]==-126){
-                     ///     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                     ///     videoOffset += data.length - 2;
-                     ///     Log.d("video frame len", String.valueOf(videoOffset));
-                     ///     showframe=true;
-//
-                     /// }
-                     //else if(data[1]==-124){
-                     //    System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                     //    videoOffset += data.length - 2;
-                     //    Log.d("video frame len", String.valueOf(videoOffset));
-
-                     //        showframe=true;
-                     //}
-                     // else if(data[1]==-123){
-                     //     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                     //     videoOffset += data.length - 2;
-                     //     Log.d("video frame len", String.valueOf(videoOffset));
-                     //         showframe=true;
-                     // }
-                     ///else if(data[1]==-121){
-                     ///    System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                     ///    videoOffset += data.length - 2;
-                     ///    Log.d("video frame len", String.valueOf(videoOffset));
-                     ///    showframe=true;
-                     ///}
-                            else if(data[1]<0){
+                            else if(data[1]==-124){
+                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                                videoOffset += data.length - 2;
+                                if(!(packetlen>=4)) {
+                                    requestIframe();
+                                }else{
+                                Log.d("video frame len", String.valueOf(videoOffset));
+                                showframe=true;}
+                            }
+                            else if(data[1]==-123){
+                                System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                                videoOffset += data.length - 2;
+                                if(!(packetlen>=5)) {
+                                    requestIframe();
+                                }else{
+                                Log.d("video frame len", String.valueOf(videoOffset));
+                                showframe=true;}
+                            }
+                            else if(data[1]<=-100){
                                 System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                                 videoOffset += data.length - 2;
                                 Log.d("video frame len", String.valueOf(videoOffset));
                                 showframe=true;
                             }
+
+                         //else if(data[1]<0){
+                         //       videoOffset = 0;
+                         //       videoFrame = new byte[100 * 1024];
+                         //       packetlen=0;
+                         //   }
                             else {
                                 System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                                 videoOffset += data.length - 2;
@@ -1466,7 +1464,7 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-
+//old form the normal sdk
     // public void rc() {
 
     //    /* if(a==70&&b==-70&&c==-70&&d==-70){
@@ -1477,18 +1475,6 @@ public class MainActivity extends AppCompatActivity {
     //     // }
     // }
 
-
-    byte[] ShortToByteaArray(Short _short) {
-        ByteBuffer buffer = ByteBuffer.allocate(2);
-        buffer.putShort(_short);
-        return buffer.array();
-    }
-
-    float ByteArrayToSingle(byte[] bytes, int index) {
-        byte[] slice = Arrays.copyOfRange(bytes, index, bytes.length);
-
-        return ByteBuffer.wrap(slice).getFloat();
-    }
 
     public void set(byte[] data)
     {
@@ -1778,11 +1764,11 @@ public class MainActivity extends AppCompatActivity {
                             Log.d("Cmd id", String.valueOf(cmdId));
                             String dataString= new String(packet.getData(), StandardCharsets.UTF_8);
                             if(dataString.startsWith("conn_ack")&&connected==false){
+                                setPicVidMode(0);
                                 streamon();
                                 setEis(0);
-                                setPicVidMode(0);
                                 requestIframe();
-                                controllerState.setSpeedMode(1);
+                                controllerState.setSpeedMode(0);
                                 setAttAngle(25.0f);
                                 queryAttAngle();
                                 StartHeartBeatJoystick();
