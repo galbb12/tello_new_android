@@ -222,23 +222,34 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
                             //do something with raw frame in buffer.
                         }*/
 
-                    codec.releaseOutputBuffer(i, true);
-                    codec.setVideoScalingMode(MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT);
 
-                    i = codec.dequeueOutputBuffer(BufferInfo, 0L);
 
                    switch (i) {
                        case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
-                           break;
+                           codec.releaseOutputBuffer(i, false);
+                           i = codec.dequeueOutputBuffer(BufferInfo, 0L);
+                           mainActivity.requestIframe();
+                           bWaitForKeyframe=true;
 
                        case MediaCodec.INFO_TRY_AGAIN_LATER:
-                          // mainActivity.requestIframe();
+                           codec.releaseOutputBuffer(i, false);
+                           i = codec.dequeueOutputBuffer(BufferInfo, 0L);
+                           mainActivity.requestIframe();
+                           bWaitForKeyframe=true;
 
                        case MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED:
-                           break;
+                           codec.releaseOutputBuffer(i, false);
+                           i = codec.dequeueOutputBuffer(BufferInfo, 0L);
+                           mainActivity.requestIframe();
+                           bWaitForKeyframe=true;
+
 
                        default:
-                           break;
+                           codec.releaseOutputBuffer(i, true);
+                           codec.setVideoScalingMode(MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT);
+
+                           i = codec.dequeueOutputBuffer(BufferInfo, 0L);
+
                    }
                     //  ByteBuffer buf = codec.getOutputBuffer(-1);
                     //  byte[] imageBytes= new byte[buf.remaining()];
