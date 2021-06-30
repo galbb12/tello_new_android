@@ -25,6 +25,7 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
+import android.widget.VideoView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
@@ -37,7 +38,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 
-public class DecoderView extends TextureView {
+public class DecoderView extends TextureView implements TextureView.SurfaceTextureListener {
     private MediaCodec codec;
     private boolean bConfigured =false;
     //pic mode sps
@@ -77,17 +78,19 @@ public class DecoderView extends TextureView {
             surfaceTexture = textureView.getSurfaceTexture();
             surface= new Surface(surfaceTexture);}
         try {
-           // if (sps.length == 14){
-           //     decoderWidth = 1280;}
-           // else{
-           //     decoderWidth = 960;}
+            if (sps.length == 14){
+                decoderWidth = 1280;}
+            else{
+                decoderWidth = 960;}
 
             MediaFormat videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
             videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
             videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
-         videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate);
+     //    videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate);
          videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
             videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
+            videoFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, decoderWidth * decoderHeight);
+            videoFormat.setInteger(MediaFormat.KEY_COLOR_TRANSFER, MediaFormat.COLOR_TRANSFER_HLG);
             //videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
         //    videoFormat.setInteger(MediaFormat.KEY_FRAME_RATE,25);
 
@@ -176,7 +179,7 @@ public class DecoderView extends TextureView {
 
 
 
-        if (nalType == 5||nalType==1) {
+        if (nalType == 5) {
             bWaitForKeyframe = false;
         }
         if (bWaitForKeyframe){
@@ -229,7 +232,7 @@ public class DecoderView extends TextureView {
                            break;
 
                        case MediaCodec.INFO_TRY_AGAIN_LATER:
-                           mainActivity.requestIframe();
+                          // mainActivity.requestIframe();
 
                        case MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED:
                            break;
@@ -289,5 +292,26 @@ public class DecoderView extends TextureView {
         codec = null;
         sps = new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 60, (byte) 5, (byte) 185};
         pps = new byte[] {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
+    }
+
+    @Override
+    public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int i, int i1) {
+        Init();
+    }
+
+    @Override
+    public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int i, int i1) {
+       stop();
+    }
+
+    @Override
+    public boolean onSurfaceTextureDestroyed(SurfaceTexture surfaceTexture) {
+        stop();
+        return false;
+    }
+
+    @Override
+    public void onSurfaceTextureUpdated(SurfaceTexture surfaceTexture) {
+      stop();
     }
 }
