@@ -28,6 +28,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 
+import com.google.common.primitives.UnsignedBytes;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -1208,19 +1210,45 @@ public class MainActivity extends AppCompatActivity {
         byte[] videoFrame = new byte[100 * 4380];
         int videoOffset = 0;
         Boolean started = false;
+        float speed = 0.0f;
+        float time = 0.0f;
+        int SequenceNumber = 0;
+        int SubSequenceNumber = 0;
+        int nalType = 0;
+        int packetlen = 0;
+        int currentframe= 0;
+
+        void showframe(){
+            if(!isPaused){
+            byte[] videoFramenew = new byte[videoOffset];
+            System.arraycopy(videoFrame, 0, videoFramenew, 0, videoOffset);
+            try {
+                decoderView.decode(videoFramenew);
+            } catch (Exception e) {
+                //      decoderView.stop();
+            }
+            videoOffset = 0;
+            videoFrame = new byte[100 * 1024];
+            packetlen = 0;
+            started=false;
+            }
+
+        }
 
         @RequiresApi(api = Build.VERSION_CODES.O)
         @Override
         public void run() {
 
-            float speed = 0.0f;
-            float time = 0.0f;
-            int SequenceNumber = 0;
-            int SubSequenceNumber = 0;
-            int nalType = 0;
-            int packetlen = 0;
+             speed = 0.0f;
+             time = 0.0f;
+             SequenceNumber = 0;
+             SubSequenceNumber = 0;
+             nalType = 0;
+             packetlen = 0;
+             currentframe= 0;
             ArrayList<byte[]> PacketsArray = new ArrayList<byte[]>();
             boolean showframe = false;
+            int ignoreframe;
 
 
             Log.d("video start", "start");
@@ -1240,12 +1268,21 @@ public class MainActivity extends AppCompatActivity {
                 byte[] data = new byte[packet.getLength()];
                 //Log.d("Video Length", String.valueOf(data.length));
                 System.arraycopy(packet.getData(), 0, data, 0, packet.getLength());
-                if (data[2] == 0 && data[3] == 0 && data[4] == 0 && data[5] == 1 && !started)//Wait for first NAL
+                if (data[1] == 0 &&data[2] == 0 && data[3] == 0 && data[4] == 0 && data[5] == 1)//Wait for first NAL
                 {
                     int nal = (data[6] & 0x1f);
                     //if (nal != 0x01 && nal!=0x07 && nal != 0x08 && nal != 0x05)
                     //    Console.WriteLine("NAL type:" +nal);
+
+                        showframe();
+
+
                     started = true;
+                videoOffset = 0;
+                videoFrame = new byte[100 * 1024];
+                packetlen = 0;
+
+
                 }
                 if (started) {
 
@@ -1257,55 +1294,55 @@ public class MainActivity extends AppCompatActivity {
 
                         nalType = data[6] & 0x1f;
                         // Log.d("videoOffset", String.valueOf(videoOffset));
-                        if (showframe) {
-                            if (!isPaused) {
-                                byte[] videoFramenew = new byte[videoOffset];
-                                System.arraycopy(videoFrame, 0, videoFramenew, 0, videoOffset);
-                                try {
-                                    decoderView.decode(videoFramenew);
-                                } catch (Exception e) {
-                                    //      decoderView.stop();
-                                }
-                                videoOffset = 0;
-                                videoFrame = new byte[100 * 1024];
-                                showframe = false;
-                                packetlen = 0;
-
-                            }
-                        }
-
 
                         //System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
 
 
-                        Log.d("SequenceNumber", String.valueOf(data[0]));
-                        Log.d("SubSequenceNumber", String.valueOf(data[1]));
+                        Log.d("SequenceNumber", UnsignedBytes.toString(data[0]));  //String.valueOf((data[0]));
+                        Log.d("SubSequenceNumber", UnsignedBytes.toString(data[1]));
                         Log.d("len", String.valueOf(data.length));
                         Log.d("nal", String.valueOf(data[6] & 0x1f));
 
 
                         if (data[1] == -128) {
-                             decoderView.setVideoData(data);
+                            decoderView.setVideoData(Arrays.copyOfRange(data,2,data.length));
                             //showframe=true;
                             videoOffset = 0;
                             videoFrame = new byte[100 * 1024];
                             packetlen = 0;
                         }
-                    else if (data[1] < 0) {
-                        System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                        videoOffset += data.length - 2;
-                        Log.d("video frame len", String.valueOf(videoOffset));
-                        showframe = true;
-                    }
-                        else if (data.length != 1460) {
+                          // else if (data[1] < 0) {
+                          //     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                          //     videoOffset += data.length - 2;
+                          //     Log.d("video frame len", String.valueOf(videoOffset));
+                          //     showframe = true;
+                          // }
+                       // else if (data[1]<0) {
+                       //     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                       //     videoOffset += data.length - 2;
+                       //     Log.d("video frame len", String.valueOf(videoOffset));
+                       //    showframe();
+                       // }
+                      //else {
+                      //        videoOffset = 0;
+                      //        videoFrame = new byte[100 * 1024];
+                      //        packetlen = 0;
+                      //    }
+                        //}
+                       // else if(currentframe!=data[0]&&data[1]!=0){
+                       //     videoOffset = 0;
+                       //     videoFrame = new byte[100 * 1024];
+                       //     packetlen = 0;
+                       // }
+                        else if (currentframe==data[0]||data[1]==0) {
                             System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                            videoOffset += data.length - 2;
-                            Log.d("video frame len", String.valueOf(videoOffset));
-                            showframe = true;
-                       }  else {
-                            System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                            videoOffset += data.length - 2;
+                            videoOffset += data.length - 2; }
+                        else {
+                            videoOffset = 0;
+                            videoFrame = new byte[100 * 1024];
+                            packetlen = 0;
                         }
+                        currentframe=data[0];
 
 
                     } catch (Exception e) {
