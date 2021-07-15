@@ -1780,7 +1780,7 @@ public class MainActivity extends AppCompatActivity {
                                     if (dataString.startsWith("conn_ack") && connected == false) {
                                         connected = true;
                                         wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF ,"MyWifiManager:mWifiLock").acquire();
-                                        setPicVidMode(0);
+                                        setPicVidMode(1);
                                         streamon();
                                         setEis(0);
                                         requestIframe();

@@ -45,8 +45,8 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
     //pic mode sps
     private byte[] sps;// = new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 60, (byte) 5, (byte) 185};
     private byte[] pps;// = new byte[] {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
-    private int decoderWidth = 960;
-    private int decoderHeight = 728;
+    private int decoderWidth ;
+    private int decoderHeight;
     private boolean bWaitForKeyframe = true;
     Context CONTEXT;
     MainActivity mainActivity;
@@ -80,9 +80,12 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
         try {
             if(sps!=null){
             if (sps.length == 14){
-                decoderWidth = 1280;}
+                decoderWidth = 1280;
+            decoderHeight=728;}
             else{
-                decoderWidth = 960;}}
+                decoderWidth = 960;
+                decoderHeight=728;
+            }}
 
             videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
             if(sps!=null){
