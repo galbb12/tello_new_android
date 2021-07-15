@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.PixelFormat;
 import android.graphics.PointF;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -21,6 +22,8 @@ import android.os.StrictMode;
 import android.text.format.Formatter;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -161,6 +164,8 @@ public class MainActivity extends AppCompatActivity {
     WifiManager wifiManager;
     ConnectivityManager connManager;
     NetworkInfo mWifi;
+    SurfaceView sfvTrack;
+    SurfaceHolder sfhTrackHolder;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -190,6 +195,10 @@ public class MainActivity extends AppCompatActivity {
         textViewTemp = findViewById(R.id.textViewTemp);
         textViewRotation = findViewById(R.id.textViewRotation);
         textViewPosition = findViewById(R.id.textViewPosition);
+        sfvTrack = (SurfaceView)findViewById(R.id.TransparentView);
+        sfvTrack.setZOrderOnTop(true);    // necessary
+        sfhTrackHolder = sfvTrack.getHolder();
+        sfhTrackHolder.setFormat(PixelFormat.TRANSPARENT);
         controllerState = new ControllerState();
         AutoPilotControllerState = new ControllerState();
         BroadcastReceiver broadcastReceiver = new WifiBroadcastReceiver();
@@ -402,7 +411,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             };
-            thread.run();
+            thread.start();
         } else {
             // ffmpeg is not supported
         }
@@ -593,6 +602,7 @@ public class MainActivity extends AppCompatActivity {
             BKeepRunning = true;
             while (!connected && BKeepRunning) {
                 try {
+                    mWifi = connManager.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
                     if (mWifi.isConnected()) {
                         String ip = Formatter.formatIpAddress(wifiManager.getConnectionInfo().getIpAddress());
                         if (ip.startsWith("192.168.10.")) {
@@ -1217,6 +1227,7 @@ public class MainActivity extends AppCompatActivity {
         int nalType = 0;
         int packetlen = 0;
         int currentframe= 0;
+        byte[] pps,sps;
 
         void showframe(){
             if(!isPaused){
@@ -1227,8 +1238,10 @@ public class MainActivity extends AppCompatActivity {
             } catch (Exception e) {
                 //      decoderView.stop();
             }
+                Log.d("nal", String.valueOf(videoFramenew[4] & 0x1f));
+                Log.d("parts", String.valueOf(packetlen));
             videoOffset = 0;
-            videoFrame = new byte[100 * 1024];
+            //videoFrame = new byte[100 * 1024];
             packetlen = 0;
             started=false;
             }
@@ -1268,13 +1281,13 @@ public class MainActivity extends AppCompatActivity {
                 byte[] data = new byte[packet.getLength()];
                 //Log.d("Video Length", String.valueOf(data.length));
                 System.arraycopy(packet.getData(), 0, data, 0, packet.getLength());
-                if (data[1] == 0 &&data[2] == 0 && data[3] == 0 && data[4] == 0 && data[5] == 1)//Wait for first NAL
+                if (data[1] == 0 &&data[2] == 0 && data[3] == 0 && data[4] == 0 && data[5] == 1||data[1]==-128)//Wait for first NAL
                 {
                     int nal = (data[6] & 0x1f);
                     //if (nal != 0x01 && nal!=0x07 && nal != 0x08 && nal != 0x05)
                     //    Console.WriteLine("NAL type:" +nal);
-
-                        showframe();
+                    //if(showframe){
+                    //    showframe();}
 
 
                     started = true;
@@ -1283,6 +1296,11 @@ public class MainActivity extends AppCompatActivity {
                 packetlen = 0;
 
 
+                }else if((data[1]==0||data[1]!=-128)&&started==false){
+                    videoOffset = 0;
+                    videoFrame = new byte[100 * 1024];
+                    packetlen = 0;
+                    requestIframe();
                 }
                 if (started) {
 
@@ -1298,50 +1316,43 @@ public class MainActivity extends AppCompatActivity {
                         //System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
 
 
-                        Log.d("SequenceNumber", UnsignedBytes.toString(data[0]));  //String.valueOf((data[0]));
-                        Log.d("SubSequenceNumber", UnsignedBytes.toString(data[1]));
+
+                        Log.d("SequenceNumber", String.valueOf(data[0]));  //String.valueOf((data[0]));
+                        Log.d("SubSequenceNumber", String.valueOf(data[1]));
                         Log.d("len", String.valueOf(data.length));
-                        Log.d("nal", String.valueOf(data[6] & 0x1f));
 
 
                         if (data[1] == -128) {
                             decoderView.setVideoData(Arrays.copyOfRange(data,2,data.length));
-                            //showframe=true;
-                            videoOffset = 0;
-                            videoFrame = new byte[100 * 1024];
-                            packetlen = 0;
+                            started=false;
+                            Log.d("nal", String.valueOf(data[6] & 0x1f));
+                            Log.d("parts", String.valueOf(packetlen));
                         }
-                          // else if (data[1] < 0) {
-                          //     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                          //     videoOffset += data.length - 2;
-                          //     Log.d("video frame len", String.valueOf(videoOffset));
-                          //     showframe = true;
-                          // }
-                       // else if (data[1]<0) {
-                       //     System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                       //     videoOffset += data.length - 2;
-                       //     Log.d("video frame len", String.valueOf(videoOffset));
-                       //    showframe();
-                       // }
-                      //else {
-                      //        videoOffset = 0;
-                      //        videoFrame = new byte[100 * 1024];
-                      //        packetlen = 0;
-                      //    }
-                        //}
-                       // else if(currentframe!=data[0]&&data[1]!=0){
-                       //     videoOffset = 0;
-                       //     videoFrame = new byte[100 * 1024];
-                       //     packetlen = 0;
-                       // }
+                        else if(data[1]<0){
+                            System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                            videoOffset += data.length - 2;
+                            //if(Math.abs(data[1]+120)==videoFrame[6]){
+                            showframe();}
+                            //else{
+                            //    videoOffset = 0;
+                            //    videoFrame = new byte[100 * 1024];
+                            //    packetlen = 0;
+                            //    if(videoFrame[6]==5)
+                            //    requestIframe();
+                            //}
+
+
                         else if (currentframe==data[0]||data[1]==0) {
                             System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                            videoOffset += data.length - 2; }
+                            videoOffset += data.length - 2;
+                        }
                         else {
                             videoOffset = 0;
                             videoFrame = new byte[100 * 1024];
                             packetlen = 0;
+                            started=false;
                         }
+
                         currentframe=data[0];
 
 
@@ -1768,6 +1779,7 @@ public class MainActivity extends AppCompatActivity {
                                     String dataString = new String(packet.getData(), StandardCharsets.UTF_8);
                                     if (dataString.startsWith("conn_ack") && connected == false) {
                                         connected = true;
+                                        wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF ,"MyWifiManager:mWifiLock").acquire();
                                         setPicVidMode(0);
                                         streamon();
                                         setEis(0);

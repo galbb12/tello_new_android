@@ -12,6 +12,7 @@ import android.media.MediaCodec;
 import android.media.MediaCrypto;
 import android.media.MediaFormat;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.AttributeSet;
@@ -42,19 +43,18 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
     private MediaCodec codec;
     private boolean bConfigured =false;
     //pic mode sps
-    private byte[] sps = new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 60, (byte) 5, (byte) 185};
-
-
-
-    private byte[] pps = new byte[] {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
+    private byte[] sps;// = new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 60, (byte) 5, (byte) 185};
+    private byte[] pps;// = new byte[] {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
     private int decoderWidth = 960;
-    private int decoderHeight = 720;
+    private int decoderHeight = 728;
     private boolean bWaitForKeyframe = true;
     Context CONTEXT;
     MainActivity mainActivity;
     SurfaceTexture surfaceTexture;
     Surface surface;
     TextureView textureView;
+    MediaFormat videoFormat;
+    boolean recivedsps,recivedpps=false;
 
 
     public DecoderView(Context context, AttributeSet attributeSet) {
@@ -78,19 +78,22 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
             surfaceTexture = textureView.getSurfaceTexture();
             surface= new Surface(surfaceTexture);}
         try {
+            if(sps!=null){
             if (sps.length == 14){
                 decoderWidth = 1280;}
             else{
-                decoderWidth = 960;}
+                decoderWidth = 960;}}
 
-            MediaFormat videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
+            videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
+            if(sps!=null){
             videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
-            videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
-           videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,mainActivity.iFrameRate);
-        /// videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
-        ///    videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
-            videoFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, decoderWidth * decoderHeight);
-            //videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
+            videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));}
+          //  videoFormat.setInteger(MediaFormat.KEY_COLOR_TRANSFER,MediaFormat.COLOR_TRANSFER_SDR_VIDEO);
+           //videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,(1000/mainActivity.iFrameRate)/1000);
+         //videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
+         //   videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
+         //   videoFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 0);
+          //  videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
         //    videoFormat.setInteger(MediaFormat.KEY_FRAME_RATE,25);
 
 
@@ -98,6 +101,9 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
             String str = videoFormat.getString("mime");
             if(codec!=null){
                 codec.release();}
+            else {
+                mainActivity.requestIframe();
+            }
             MediaCodec cdx = MediaCodec.createDecoderByType(str);
             cdx.configure(videoFormat, surface, (MediaCrypto) null, 0);
             cdx.start();
@@ -143,42 +149,38 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
     }
 
     void ReinitzializeDecoderParmeters(){
-        MediaFormat videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
+
+        if(videoFormat.getByteBuffer("csd-0")!=ByteBuffer.wrap(sps)||videoFormat.getByteBuffer("csd-1")!=ByteBuffer.wrap(pps))
         videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
         videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
-        videoFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, decoderWidth * decoderHeight);
-        codec.configure(videoFormat, surface, (MediaCrypto) null, 0);
 
+        codec.configure(videoFormat, surface, (MediaCrypto) null, 0);
     }
 
-    public void setVideoData(byte[] array){
+    public void setVideoData(byte[] array) throws IOException {
 
         int nalType = array[4] & 0x1f;
+
        if(nalType==8){
-         if(array!=pps){
            pps=array;
-           //ReinitzializeDecoderParmeters();
-         }
+           recivedpps=true;
+           ReinitzializeDecoderParmeters();
 
        }
          if(nalType==7){
-
-             if(array!=sps){
+             recivedsps=true;
                  sps=array;
-                 //ReinitzializeDecoderParmeters();
-            }
-
-        }
-
+}
 
     }
 
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-    public void decode(byte[] array) {
+    public void decode(byte[] array) throws IOException {
         Log.d("decode", "decode");
         if (!bConfigured) {
-            Init();
+            if(pps!=null){
+            Init();}
         }
 
         int nalType = array[4] & 0x1f;
@@ -189,8 +191,24 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
 
 
         if (nalType == 5) {
+           // if(setvideoparmeters){
+           //     setvideoparmeters=false;
+           //     ReinitzializeDecoderParmeters();}
+
             bWaitForKeyframe = false;
         }
+        //if (nalType == 1) {
+        //    if(recivedpps&&recivedsps){
+        //        ReinitzializeDecoderParmeters();
+        //        recivedsps=false;
+        //        recivedpps=false;
+        //}
+        //}
+        //else if(nalType==1){
+        //    if(setvideoparmeters){
+        //   setvideoparmeters=false;
+        //   ReinitzializeDecoderParmeters();}
+        //}
         if (bWaitForKeyframe){
             return;}
 
@@ -211,13 +229,20 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
                     //Send data to decoder.
                     ByteBuffer byteBuffer = inputBuffer;
                     byteBuffer.clear();
-                    byteBuffer.put(array);
-                    codec.queueInputBuffer(dequeueInputBuffer, 0, array.length, 0L, 0);
+                    if(nalType==5){
+                       // byteBuffer.put(sps);
+                       // byteBuffer.put(pps);
+                        byteBuffer.put(array);
+                        codec.queueInputBuffer(dequeueInputBuffer, 0, array.length, -1L,MediaCodec.BUFFER_FLAG_KEY_FRAME);}
+                    else {
+                        byteBuffer.put(array);
+                        codec.queueInputBuffer(dequeueInputBuffer, 0, array.length, -1L,MediaCodec.BUFFER_FLAG_PARTIAL_FRAME);
+                    }
+
                 }
 
                 //Show decoded frame
                 MediaCodec.BufferInfo BufferInfo = new MediaCodec.BufferInfo();
-                Log.d("tag", String.valueOf(BufferInfo.size));
                 int i = codec.dequeueOutputBuffer(BufferInfo, 0L);
                 while (i >= 0) {
                         /*if (picSurface == null)//Only if not using display surface.
@@ -234,43 +259,31 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
 
 
 
-                    if(!bWaitForKeyframe){
-                   switch (i) {
-                       case MediaCodec.INFO_OUTPUT_FORMAT_CHANGED:
-                       case MediaCodec.INFO_TRY_AGAIN_LATER:
-                          // codec.releaseOutputBuffer(i, false);
-                          // mainActivity.requestIframe();
-                          // bWaitForKeyframe=true;
-                          // Log.d("corrupted frame","corrupted frame");
 
 
 
-                       default:
-                           codec.releaseOutputBuffer(i, true);
-                           codec.setVideoScalingMode(MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT);
-
-
-                   }
+                        codec.releaseOutputBuffer(i, true);
+                        codec.setVideoScalingMode(MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT);
                         i = codec.dequeueOutputBuffer(BufferInfo, 0L);
-                    }
-                    //  ByteBuffer buf = codec.getOutputBuffer(-1);
-                    //  byte[] imageBytes= new byte[buf.remaining()];
-                    //  buf.get(imageBytes);
-                    //  Bitmap bitmap= BitmapFactory.decodeByteArray(imageBytes,0,imageBytes.length);
-                    //  FileOutputStream out = new FileOutputStream("");
-                    //  bitmap.compress(Bitmap.CompressFormat.PNG,100,)
 
-                    //Image image = codec.getOutputImage(0);
-                    //  YuvImage yuvImage = new YuvImage(YUV_420_888toNV21(image), ImageFormat.NV21, decoderWidth,decoderHeight, null);
-                    //  ByteArrayOutputStream stream = new ByteArrayOutputStream();
-                    //  yuvImage.compressToJpeg(new Rect(0, 0, decoderWidth, decoderHeight), 80, stream);
-                    //  Bitmap bitmap = BitmapFactory.decodeByteArray(stream.toByteArray(), 0, stream.size());
-                    //  try {
-                    //      stream.close();
-                    //  } catch (IOException e) {
-                    //      e.printStackTrace();
-                    //  }
-                }
+                        //  ByteBuffer buf = codec.getOutputBuffer(-1);
+                        //  byte[] imageBytes= new byte[buf.remaining()];
+                        //  buf.get(imageBytes);
+                        //  Bitmap bitmap= BitmapFactory.decodeByteArray(imageBytes,0,imageBytes.length);
+                        //  FileOutputStream out = new FileOutputStream("");
+                        //  bitmap.compress(Bitmap.CompressFormat.PNG,100,)
+
+                        //Image image = codec.getOutputImage(0);
+                        //  YuvImage yuvImage = new YuvImage(YUV_420_888toNV21(image), ImageFormat.NV21, decoderWidth,decoderHeight, null);
+                        //  ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                        //  yuvImage.compressToJpeg(new Rect(0, 0, decoderWidth, decoderHeight), 80, stream);
+                        //  Bitmap bitmap = BitmapFactory.decodeByteArray(stream.toByteArray(), 0, stream.size());
+                        //  try {
+                        //      stream.close();
+                        //  } catch (IOException e) {
+                        //      e.printStackTrace();
+                        //  }
+                    }
 
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -303,8 +316,8 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
             }
         }
         codec = null;
-        sps = new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 60, (byte) 5, (byte) 185};
-        pps = new byte[] {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
+        //sps = new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 60, (byte) 5, (byte) 185};
+        //pps = new byte[] {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
     }
 
     @Override
