@@ -47,7 +47,7 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
     private byte[] pps;// = new byte[] {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
     private int decoderWidth ;
     private int decoderHeight;
-    private boolean bWaitForKeyframe = true;
+     boolean bWaitForKeyframe = true;
     Context CONTEXT;
     MainActivity mainActivity;
     SurfaceTexture surfaceTexture;
@@ -73,38 +73,40 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public void Init() {
 
-        if(surface == null){
-            textureView=this;
-            surfaceTexture = textureView.getSurfaceTexture();
-            surface= new Surface(surfaceTexture);}
-        try {
-            if(sps!=null){
-            if (sps.length == 14){
-                decoderWidth = 1280;
-            decoderHeight=728;}
-            else{
-                decoderWidth = 960;
-                decoderHeight=728;
-            }}
+        if(sps!=null) {
+            if (surface == null) {
+                textureView = this;
+                surfaceTexture = textureView.getSurfaceTexture();
+                surface = new Surface(surfaceTexture);
+            }
+            try {
+                if (sps.length == 14) {
+                    decoderWidth = 1280;
+                    decoderHeight = 720;
+                } else {
+                    decoderWidth = 960;
+                    decoderHeight = 720;
+                }
+
 
             videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
-            if(sps!=null){
-            videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
-            videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));}
-          //  videoFormat.setInteger(MediaFormat.KEY_COLOR_TRANSFER,MediaFormat.COLOR_TRANSFER_SDR_VIDEO);
-           //videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,(1000/mainActivity.iFrameRate)/1000);
-         //videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
-         //   videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
-         //   videoFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 0);
-          //  videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
-        //    videoFormat.setInteger(MediaFormat.KEY_FRAME_RATE,25);
-
+            if (sps != null) {
+                videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
+                videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
+            }
+            //  videoFormat.setInteger(MediaFormat.KEY_COLOR_TRANSFER,MediaFormat.COLOR_TRANSFER_SDR_VIDEO);
+            //videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,(1000/mainActivity.iFrameRate)/1000);
+           // videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
+           //    videoFormat.setInteger(MediaFormat.KEY_WIDTH,decoderWidth);
+            //   videoFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 0);
+            //  videoFormat.setInteger(MediaFormat.KEY_CAPTURE_RATE,30);
+            //    videoFormat.setInteger(MediaFormat.KEY_FRAME_RATE,25);
 
 
             String str = videoFormat.getString("mime");
-            if(codec!=null){
-                codec.release();}
-            else {
+            if (codec != null) {
+                codec.release();
+            } else {
                 mainActivity.requestIframe();
             }
             MediaCodec cdx = MediaCodec.createDecoderByType(str);
@@ -113,49 +115,52 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
 
             codec = cdx;
 
-                    //Code goes here
-                    int videoWidth = decoderWidth;
-                    int videoHeight = decoderHeight;
-                    float videoProportion = (float) videoWidth / (float) videoHeight;
-                    WindowManager windowManager = (WindowManager) mainActivity.activity.getSystemService(Context.WINDOW_SERVICE);
+            //Code goes here
+            int videoWidth = decoderWidth;
+            int videoHeight = decoderHeight;
+            float videoProportion = (float) videoWidth / (float) videoHeight;
+            WindowManager windowManager = (WindowManager) mainActivity.activity.getSystemService(Context.WINDOW_SERVICE);
 
-                    // Get the width of the screen
-                    int screenWidth =  windowManager.getDefaultDisplay().getWidth();
-                    int screenHeight = windowManager.getDefaultDisplay().getHeight();
-                    float screenProportion = (float) screenWidth / (float) screenHeight;
+            // Get the width of the screen
+            int screenWidth = windowManager.getDefaultDisplay().getWidth();
+            int screenHeight = windowManager.getDefaultDisplay().getHeight();
+            float screenProportion = (float) screenWidth / (float) screenHeight;
 
-                    // Get the SurfaceView layout parameters
-                ConstraintLayout.LayoutParams lp = (ConstraintLayout.LayoutParams) this.getLayoutParams();
-                    if (videoProportion > screenProportion) {
-                        lp.width = screenWidth;
-                        lp.height = (int) ((float) screenWidth / videoProportion);
-                    } else {
-                        lp.width = (int) (videoProportion * (float) screenHeight);
-                        lp.height = screenHeight;
-                    }
-                    // Commit the layout parameters
-                    this.setLayoutParams(lp);
-                    Log.d("Configured", "Configured");
-                    bConfigured = true;// This is your code
+            // Get the SurfaceView layout parameters
+            ConstraintLayout.LayoutParams lp = (ConstraintLayout.LayoutParams) this.getLayoutParams();
+            if (videoProportion > screenProportion) {
+                lp.width = screenWidth;
+                lp.height = (int) ((float) screenWidth / videoProportion);
+            } else {
+                lp.width = (int) (videoProportion * (float) screenHeight);
+                lp.height = screenHeight;
+            }
+            // Commit the layout parameters
+            this.setLayoutParams(lp);
+            Log.d("Configured", "Configured");
+            bConfigured = true;// This is your code
+        }
 
 
 
      //   return;
-        } catch (Exception exception) {
+         catch (Exception exception) {
             //handle
             //bConfigured=false;
             // Init();
             exception.printStackTrace();
             //stop();
-        }
+        }}
 
     }
 
     void ReinitzializeDecoderParmeters(){
 
         if(videoFormat.getByteBuffer("csd-0")!=ByteBuffer.wrap(sps)||videoFormat.getByteBuffer("csd-1")!=ByteBuffer.wrap(pps))
-        videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
-        videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
+            if(recivedsps){
+        videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));}
+        if(recivedpps){
+        videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));}
 
         codec.configure(videoFormat, surface, (MediaCrypto) null, 0);
     }
@@ -167,12 +172,15 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
        if(nalType==8){
            pps=array;
            recivedpps=true;
+
            ReinitzializeDecoderParmeters();
+
 
        }
          if(nalType==7){
              recivedsps=true;
                  sps=array;
+                 ReinitzializeDecoderParmeters();
 }
 
     }
@@ -198,7 +206,14 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
            //     setvideoparmeters=false;
            //     ReinitzializeDecoderParmeters();}
 
-            bWaitForKeyframe = false;
+
+
+                //recivedsps=false;
+                //recivedpps=false;
+                bWaitForKeyframe = false;
+
+
+
         }
         //if (nalType == 1) {
         //    if(recivedpps&&recivedsps){
@@ -233,11 +248,11 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
                     ByteBuffer byteBuffer = inputBuffer;
                     byteBuffer.clear();
                     if(nalType==5){
-                       // byteBuffer.put(sps);
-                       // byteBuffer.put(pps);
+                        byteBuffer.put(sps);
+                        byteBuffer.put(pps);
                         byteBuffer.put(array);
                         codec.queueInputBuffer(dequeueInputBuffer, 0, array.length, -1L,MediaCodec.BUFFER_FLAG_KEY_FRAME);}
-                    else {
+                    else if(nalType==1){
                         byteBuffer.put(array);
                         codec.queueInputBuffer(dequeueInputBuffer, 0, array.length, -1L,MediaCodec.BUFFER_FLAG_PARTIAL_FRAME);
                     }
@@ -246,6 +261,7 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
 
                 //Show decoded frame
                 MediaCodec.BufferInfo BufferInfo = new MediaCodec.BufferInfo();
+
                 int i = codec.dequeueOutputBuffer(BufferInfo, 0L);
                 while (i >= 0) {
                         /*if (picSurface == null)//Only if not using display surface.

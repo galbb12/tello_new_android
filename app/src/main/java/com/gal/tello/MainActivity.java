@@ -8,8 +8,12 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.PointF;
+import android.graphics.PorterDuff;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiInfo;
@@ -135,7 +139,7 @@ public class MainActivity extends AppCompatActivity {
     int picMode;
     DatagramSocket socketStreamOnServer;
     static Activity activity;
-    int bitrate = 2;
+    int bitrate = 3;
     static ControllerState controllerState;
     static ControllerState AutoPilotControllerState;
     static JoystickView joystickr;
@@ -143,7 +147,7 @@ public class MainActivity extends AppCompatActivity {
     View joystickviewlocatorL;
     View joystickviewlocatorR;
 
-    float iFrameRate = 10f;
+    float iFrameRate = 3f;
     Float posX = 0.0f;
     Float posY = 0.0f;
     Float posZ = 0.0f;
@@ -166,6 +170,8 @@ public class MainActivity extends AppCompatActivity {
     NetworkInfo mWifi;
     SurfaceView sfvTrack;
     SurfaceHolder sfhTrackHolder;
+    Canvas canvas;
+    Paint paint;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -1241,7 +1247,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d("nal", String.valueOf(videoFramenew[4] & 0x1f));
                 Log.d("parts", String.valueOf(packetlen));
             videoOffset = 0;
-            //videoFrame = new byte[100 * 1024];
+            videoFrame = new byte[100 * 1024];
             packetlen = 0;
             started=false;
             }
@@ -1296,11 +1302,6 @@ public class MainActivity extends AppCompatActivity {
                 packetlen = 0;
 
 
-                }else if((data[1]==0||data[1]!=-128)&&started==false){
-                    videoOffset = 0;
-                    videoFrame = new byte[100 * 1024];
-                    packetlen = 0;
-                    requestIframe();
                 }
                 if (started) {
 
@@ -1327,6 +1328,10 @@ public class MainActivity extends AppCompatActivity {
                             started=false;
                             Log.d("nal", String.valueOf(data[6] & 0x1f));
                             Log.d("parts", String.valueOf(packetlen));
+                            videoOffset = 0;
+                            videoFrame = new byte[100 * 1024];
+                            packetlen = 0;
+                            started=false;
                         }
                         else if(data[1]<0){
                             System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
@@ -1342,11 +1347,22 @@ public class MainActivity extends AppCompatActivity {
                             //}
 
 
-                        else if (currentframe==data[0]||data[1]==0) {
+                        else if (currentframe==data[0]&&packetlen==data[1]||data[1]==0) {
+                            if(data[1]==0){
+                                videoOffset = 0;
+                                videoFrame = new byte[100 * 1024];
+                                packetlen = 0;
+                            }
+                            if(data.length==1460){
                             System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                            videoOffset += data.length - 2;
+                            videoOffset += data.length - 2;}
                         }
                         else {
+
+                                decoderView.bWaitForKeyframe=true;
+                          //      requestIframe();
+
+
                             videoOffset = 0;
                             videoFrame = new byte[100 * 1024];
                             packetlen = 0;
