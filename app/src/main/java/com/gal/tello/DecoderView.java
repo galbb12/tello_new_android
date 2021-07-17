@@ -41,7 +41,7 @@ import java.time.LocalDateTime;
 
 public class DecoderView extends TextureView implements TextureView.SurfaceTextureListener {
     private MediaCodec codec;
-    private boolean bConfigured =false;
+    Boolean bConfigured =false;
     //pic mode sps
     private byte[] sps;// = new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 60, (byte) 5, (byte) 185};
     private byte[] pps;// = new byte[] {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
@@ -94,6 +94,7 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
                 videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
                 videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
             }
+            videoFormat.setInteger(MediaFormat.KEY_PRIORITY,0);
             //  videoFormat.setInteger(MediaFormat.KEY_COLOR_TRANSFER,MediaFormat.COLOR_TRANSFER_SDR_VIDEO);
             //videoFormat.setFloat(MediaFormat.KEY_I_FRAME_INTERVAL,(1000/mainActivity.iFrameRate)/1000);
            // videoFormat.setInteger(MediaFormat.KEY_HEIGHT,decoderHeight);
@@ -239,7 +240,7 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
 
 
 
-        if (bConfigured) {
+        if (bConfigured||nalType==8||nalType==7) {
             try {
                 int dequeueInputBuffer = codec.dequeueInputBuffer(-1L);
                 ByteBuffer inputBuffer = codec.getInputBuffer(dequeueInputBuffer);
@@ -248,13 +249,31 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
                     ByteBuffer byteBuffer = inputBuffer;
                     byteBuffer.clear();
                     if(nalType==5){
-                        byteBuffer.put(sps);
-                        byteBuffer.put(pps);
+                       // byteBuffer.put(sps);
+                       // byteBuffer.put(pps);
                         byteBuffer.put(array);
                         codec.queueInputBuffer(dequeueInputBuffer, 0, array.length, -1L,MediaCodec.BUFFER_FLAG_KEY_FRAME);}
                     else if(nalType==1){
                         byteBuffer.put(array);
                         codec.queueInputBuffer(dequeueInputBuffer, 0, array.length, -1L,MediaCodec.BUFFER_FLAG_PARTIAL_FRAME);
+                    }
+                    else if(nalType==8||nalType==7){
+                        if(bConfigured){
+                        byteBuffer.put(array);
+                        codec.queueInputBuffer(dequeueInputBuffer, 0, array.length, -1L,MediaCodec.BUFFER_FLAG_CODEC_CONFIG);}
+                        if(nalType==8){
+                            pps=array;
+                            recivedpps=true;
+
+                          //  ReinitzializeDecoderParmeters();
+
+
+                        }
+                        if(nalType==7){
+                            recivedsps=true;
+                            sps=array;
+                          //  ReinitzializeDecoderParmeters();
+                        }
                     }
 
                 }

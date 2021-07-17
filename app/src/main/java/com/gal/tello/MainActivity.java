@@ -139,7 +139,7 @@ public class MainActivity extends AppCompatActivity {
     int picMode;
     DatagramSocket socketStreamOnServer;
     static Activity activity;
-    int bitrate = 3;
+    int bitrate = 4;
     static ControllerState controllerState;
     static ControllerState AutoPilotControllerState;
     static JoystickView joystickr;
@@ -147,7 +147,7 @@ public class MainActivity extends AppCompatActivity {
     View joystickviewlocatorL;
     View joystickviewlocatorR;
 
-    float iFrameRate = 3f;
+    float iFrameRate = 4f;
     Float posX = 0.0f;
     Float posY = 0.0f;
     Float posZ = 0.0f;
@@ -1235,6 +1235,7 @@ public class MainActivity extends AppCompatActivity {
         int currentframe= 0;
         byte[] pps,sps;
 
+
         void showframe(){
             if(!isPaused){
             byte[] videoFramenew = new byte[videoOffset];
@@ -1257,6 +1258,7 @@ public class MainActivity extends AppCompatActivity {
         @RequiresApi(api = Build.VERSION_CODES.O)
         @Override
         public void run() {
+            Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
 
              speed = 0.0f;
              time = 0.0f;
@@ -1324,7 +1326,9 @@ public class MainActivity extends AppCompatActivity {
 
 
                         if (data[1] == -128) {
-                            decoderView.setVideoData(Arrays.copyOfRange(data,2,data.length));
+                            decoderView.decode(Arrays.copyOfRange(data,2,data.length));
+                            if(!decoderView.bConfigured){
+                            decoderView.setVideoData(Arrays.copyOfRange(data,2,data.length));}
                             started=false;
                             Log.d("nal", String.valueOf(data[6] & 0x1f));
                             Log.d("parts", String.valueOf(packetlen));
@@ -1359,8 +1363,10 @@ public class MainActivity extends AppCompatActivity {
                         }
                         else {
 
-                                decoderView.bWaitForKeyframe=true;
-                          //      requestIframe();
+                            decoderView.bWaitForKeyframe=true;
+                                if(nalType==5){
+
+                            requestIframe();}
 
 
                             videoOffset = 0;
