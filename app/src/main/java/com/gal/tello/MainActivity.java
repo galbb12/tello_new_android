@@ -72,7 +72,7 @@ import java.lang.*;
 
 
 public class MainActivity extends AppCompatActivity {
-    byte[] picbuffer = new byte[3000 * 1024];
+    byte[] picbuffer = new byte[3000 * 1460];
     boolean[] picPieceState;
     File h264FilePath;
     File videoFilePath;
@@ -147,7 +147,7 @@ public class MainActivity extends AppCompatActivity {
     View joystickviewlocatorL;
     View joystickviewlocatorR;
 
-    float iFrameRate = 4f;
+    float iFrameRate = 1f;
     Float posX = 0.0f;
     Float posY = 0.0f;
     Float posZ = 0.0f;
@@ -226,6 +226,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
 
+                // save the X,Y coordinates
                 // save the X,Y coordinates
                 if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
                     joystickl.setX(v.getX() - v.getWidth() / 2 + event.getX());
@@ -875,6 +876,7 @@ public class MainActivity extends AppCompatActivity {
     */
     void setPicVidMode(int mode) {
         //                                          crc    typ  cmdL  cmdH  seqL  seqH  modL  crc   crc
+        //                                          crc    typ  cmdL  cmdH  seqL  seqH  modL  crc   crc
         byte[] packet = new byte[]{(byte) 0xcc, 0x60, 0x00, 0x27, 0x68, 0x31, 0x00, 0x00, 0x00, 0x00, 0x5b, (byte) 0xc5};
 
         picMode = mode;
@@ -1248,7 +1250,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d("nal", String.valueOf(videoFramenew[4] & 0x1f));
                 Log.d("parts", String.valueOf(packetlen));
             videoOffset = 0;
-            videoFrame = new byte[100 * 1024];
+            videoFrame = new byte[100 * 1460];
             packetlen = 0;
             started=false;
             }
@@ -1289,7 +1291,7 @@ public class MainActivity extends AppCompatActivity {
                 byte[] data = new byte[packet.getLength()];
                 //Log.d("Video Length", String.valueOf(data.length));
                 System.arraycopy(packet.getData(), 0, data, 0, packet.getLength());
-                if (data[1] == 0 &&data[2] == 0 && data[3] == 0 && data[4] == 0 && data[5] == 1||data[1]==-128)//Wait for first NAL
+                if (data[2] == 0 && data[3] == 0 && data[4] == 0 && data[5] == 1)//Wait for first NAL
                 {
                     int nal = (data[6] & 0x1f);
                     //if (nal != 0x01 && nal!=0x07 && nal != 0x08 && nal != 0x05)
@@ -1300,7 +1302,7 @@ public class MainActivity extends AppCompatActivity {
 
                     started = true;
                 videoOffset = 0;
-                videoFrame = new byte[100 * 1024];
+                videoFrame = new byte[100 * 1460];
                 packetlen = 0;
 
 
@@ -1326,53 +1328,36 @@ public class MainActivity extends AppCompatActivity {
 
 
                         if (data[1] == -128) {
-                            decoderView.decode(Arrays.copyOfRange(data,2,data.length));
-                            if(!decoderView.bConfigured){
-                            decoderView.setVideoData(Arrays.copyOfRange(data,2,data.length));}
+                           // decoderView.decode(Arrays.copyOfRange(data,2,data.length));
+                           // if(!decoderView.bConfigured){
+                          //  decoderView.setVideoData(Arrays.copyOfRange(data,2,data.length));//}
                             started=false;
                             Log.d("nal", String.valueOf(data[6] & 0x1f));
                             Log.d("parts", String.valueOf(packetlen));
                             videoOffset = 0;
-                            videoFrame = new byte[100 * 1024];
+                            videoFrame = new byte[100 * 1460];
                             packetlen = 0;
                             started=false;
                         }
-                        else if(data[1]<0){
+                         if(data[1]<0){
                             System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
                             videoOffset += data.length - 2;
                             //if(Math.abs(data[1]+120)==videoFrame[6]){
                             showframe();}
                             //else{
                             //    videoOffset = 0;
-                            //    videoFrame = new byte[100 * 1024];
+                            //    videoFrame = new byte[100 * 1460];
                             //    packetlen = 0;
                             //    if(videoFrame[6]==5)
                             //    requestIframe();
                             //}
 
 
-                        else if (currentframe==data[0]&&packetlen==data[1]||data[1]==0) {
-                            if(data[1]==0){
-                                videoOffset = 0;
-                                videoFrame = new byte[100 * 1024];
-                                packetlen = 0;
-                            }
-                            if(data.length==1460){
-                            System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
-                            videoOffset += data.length - 2;}
-                        }
                         else {
 
-                            decoderView.bWaitForKeyframe=true;
-                                if(nalType==5){
 
-                            requestIframe();}
-
-
-                            videoOffset = 0;
-                            videoFrame = new byte[100 * 1024];
-                            packetlen = 0;
-                            started=false;
+                            System.arraycopy(data, 2, videoFrame, videoOffset, data.length - 2);
+                            videoOffset += data.length - 2;
                         }
 
                         currentframe=data[0];
@@ -1802,7 +1787,7 @@ public class MainActivity extends AppCompatActivity {
                                     if (dataString.startsWith("conn_ack") && connected == false) {
                                         connected = true;
                                         wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF ,"MyWifiManager:mWifiLock").acquire();
-                                        setPicVidMode(1);
+                                        //setPicVidMode(0);
                                         streamon();
                                         setEis(0);
                                         requestIframe();
@@ -1894,7 +1879,7 @@ public class MainActivity extends AppCompatActivity {
                                             picbuffer = new byte[picBytesExpected];
                                         }
                                         picBytesRecived = 0;
-                                        picChunkState = new boolean[Math.abs(picBytesExpected / 1024) + 1]; //calc based on size.
+                                        picChunkState = new boolean[Math.abs(picBytesExpected / 1460) + 1]; //calc based on size.
                                         picPieceState = new boolean[(picChunkState.length / 8) + 1];
                                         picExtraPackets = 0;//for debugging.
                                         picDownloading = true;
@@ -1925,7 +1910,7 @@ public class MainActivity extends AppCompatActivity {
 
                                         maxPieceNum = Math.max((int) pieceNum, maxPieceNum);
                                         if (!picChunkState[seqNum]) {
-                                            System.arraycopy(recived, start, picbuffer, seqNum * 1024, size);
+                                            System.arraycopy(recived, start, picbuffer, seqNum * 1460, size);
                                             picBytesRecived += size;
                                             picChunkState[seqNum] = true;
 

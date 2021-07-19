@@ -43,8 +43,8 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
     private MediaCodec codec;
     Boolean bConfigured =false;
     //pic mode sps
-    private byte[] sps;// = new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 60, (byte) 5, (byte) 185};
-    private byte[] pps;// = new byte[] {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
+    private byte[] sps= new byte[]{(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 103, (byte) 77, (byte) 64, (byte) 40, (byte) 149, (byte) 160, (byte) 60, (byte) 5, (byte) 185};
+    private byte[] pps= new byte[] {(byte) 0, (byte) 0, (byte) 0, (byte) 1, (byte) 104, (byte) 238, (byte) 56, (byte) 128};
     private int decoderWidth ;
     private int decoderHeight;
      boolean bWaitForKeyframe = true;
@@ -72,21 +72,21 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public void Init() {
-
-        if(sps!=null) {
+        decoderWidth = 1280;
+        decoderHeight = 720;
             if (surface == null) {
                 textureView = this;
                 surfaceTexture = textureView.getSurfaceTexture();
                 surface = new Surface(surfaceTexture);
             }
             try {
-                if (sps.length == 14) {
-                    decoderWidth = 1280;
-                    decoderHeight = 720;
-                } else {
-                    decoderWidth = 960;
-                    decoderHeight = 720;
-                }
+              // if (sps.length == 14) {
+              //     decoderWidth = 1280;
+              //     decoderHeight = 720;
+              // } else {
+              //     decoderWidth = 960;
+              //     decoderHeight = 720;
+              // }
 
 
             videoFormat = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, decoderWidth, decoderHeight);
@@ -137,7 +137,7 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
                 lp.height = screenHeight;
             }
             // Commit the layout parameters
-            this.setLayoutParams(lp);
+            //this.setLayoutParams(lp);
             Log.d("Configured", "Configured");
             bConfigured = true;// This is your code
         }
@@ -151,20 +151,18 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
             // Init();
             exception.printStackTrace();
             //stop();
-        }}
+        }
 
     }
 
-    void ReinitzializeDecoderParmeters(){
+void ReinitzializeDecoderParmeters(){
 
-        if(videoFormat.getByteBuffer("csd-0")!=ByteBuffer.wrap(sps)||videoFormat.getByteBuffer("csd-1")!=ByteBuffer.wrap(pps))
-            if(recivedsps){
-        videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));}
-        if(recivedpps){
-        videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));}
+    if(videoFormat.getByteBuffer("csd-0")!=ByteBuffer.wrap(sps)||videoFormat.getByteBuffer("csd-1")!=ByteBuffer.wrap(pps))
+    videoFormat.setByteBuffer("csd-0", ByteBuffer.wrap(sps));
+    videoFormat.setByteBuffer("csd-1", ByteBuffer.wrap(pps));
 
-        codec.configure(videoFormat, surface, (MediaCrypto) null, 0);
-    }
+    codec.configure(videoFormat, surface, (MediaCrypto) null, 0);
+}
 
     public void setVideoData(byte[] array) throws IOException {
 
@@ -190,10 +188,10 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public void decode(byte[] array) throws IOException {
         Log.d("decode", "decode");
-        if (!bConfigured) {
-            if(pps!=null){
-            Init();}
-        }
+       if (!bConfigured) {
+           if(pps!=null){
+           Init();}
+       }
 
         int nalType = array[4] & 0x1f;
 
@@ -228,19 +226,14 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
         //   setvideoparmeters=false;
         //   ReinitzializeDecoderParmeters();}
         //}
-        if (bWaitForKeyframe){
-            return;}
 
 
 
 
-        if (bConfigured == false) {
-            return;
-        }
 
 
 
-        if (bConfigured||nalType==8||nalType==7) {
+        if (bConfigured) {
             try {
                 int dequeueInputBuffer = codec.dequeueInputBuffer(-1L);
                 ByteBuffer inputBuffer = codec.getInputBuffer(dequeueInputBuffer);
@@ -249,30 +242,35 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
                     ByteBuffer byteBuffer = inputBuffer;
                     byteBuffer.clear();
                     if(nalType==5){
+                       //byteBuffer.put(sps);
+                       //byteBuffer.put(pps);
+                        byteBuffer.put(array);
+                        codec.queueInputBuffer(dequeueInputBuffer, 0, array.length, 0L,MediaCodec.BUFFER_FLAG_KEY_FRAME);}
+                    else if(nalType==1){
                        // byteBuffer.put(sps);
                        // byteBuffer.put(pps);
                         byteBuffer.put(array);
-                        codec.queueInputBuffer(dequeueInputBuffer, 0, array.length, -1L,MediaCodec.BUFFER_FLAG_KEY_FRAME);}
-                    else if(nalType==1){
-                        byteBuffer.put(array);
-                        codec.queueInputBuffer(dequeueInputBuffer, 0, array.length, -1L,MediaCodec.BUFFER_FLAG_PARTIAL_FRAME);
+                        codec.queueInputBuffer(dequeueInputBuffer, 0, array.length, 0L,MediaCodec.BUFFER_FLAG_PARTIAL_FRAME);
                     }
                     else if(nalType==8||nalType==7){
-                        if(bConfigured){
-                        byteBuffer.put(array);
-                        codec.queueInputBuffer(dequeueInputBuffer, 0, array.length, -1L,MediaCodec.BUFFER_FLAG_CODEC_CONFIG);}
+                       // if(bConfigured) {
+                          //  byteBuffer.put(array);
+                          //  codec.queueInputBuffer(dequeueInputBuffer, 0, array.length, 0L,MediaCodec.BUFFER_FLAG_CODEC_CONFIG);
+                       // }
                         if(nalType==8){
                             pps=array;
-                            recivedpps=true;
+                            Log.d("pps","pps");
+                           // recivedpps=true;
 
-                          //  ReinitzializeDecoderParmeters();
+                           // ReinitzializeDecoderParmeters();
 
 
                         }
                         if(nalType==7){
-                            recivedsps=true;
+                         //   recivedsps=true;
                             sps=array;
-                          //  ReinitzializeDecoderParmeters();
+                            Log.d("sps","sps");
+                         //   ReinitzializeDecoderParmeters();
                         }
                     }
 
@@ -332,9 +330,9 @@ public class DecoderView extends TextureView implements TextureView.SurfaceTextu
                 //bConfigured = false;
 
 
-                stop();
+               // stop();
             }
-        }else{stop();}
+        }
     }
 
 
